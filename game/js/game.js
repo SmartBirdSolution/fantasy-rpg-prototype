@@ -258,7 +258,10 @@ class Game {
       UI.openTradeWindow(
         this.player,
         peerName,
-        items  => Network.sendTradeOffer(sessionId, items),
+        items  => {
+          this._tradeSession.myOffer = items; // keep invIdx locally
+          Network.sendTradeOffer(sessionId, items.map(({ invIdx, ...rest }) => rest));
+        },
         ()     => Network.sendTradeConfirm(sessionId),
         ()     => { Network.sendTradeCancel(sessionId); this._tradeSession = null; }
       );
@@ -273,13 +276,21 @@ class Game {
     };
 
     Network.onTradeComplete = ({ receivedItems }) => {
-      if (receivedItems) {
-        for (const item of receivedItems) {
-          if (item.slot === 'gold') {
-            this.player.addGold(item.amount || 0);
-          } else {
-            this.player.addToInventory({ ...item });
-          }
+      // Remove offered items from inventory
+      const myOffer = this._tradeSession?.myOffer || [];
+      for (const offered of myOffer) {
+        if (offered.slot === 'gold') {
+          this.player.addGold(-(offered.amount || 0));
+        } else if (offered.invIdx != null) {
+          this.player.inventory[offered.invIdx] = null;
+        }
+      }
+      // Add received items
+      for (const item of (receivedItems || [])) {
+        if (item.slot === 'gold') {
+          this.player.addGold(item.amount || 0);
+        } else {
+          this.player.addToInventory({ ...item });
         }
       }
       UI.closeTradeWindow();

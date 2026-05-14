@@ -432,9 +432,9 @@ const UI = {
     document.getElementById('trade-peer-confirmed').style.display = 'none';
     document.getElementById('btn-trade-confirm').classList.remove('confirmed');
 
-    this._renderTradeLocalGrid();
     this._renderTradeYourOffer();
     this._renderTradePeerOffer([]);
+    this._renderTradeLocalGrid();
 
     // Clear peer grid (unknown until they send their bag)
     document.getElementById('trade-peer-grid').innerHTML = '';
@@ -473,28 +473,14 @@ const UI = {
           el.addEventListener('dragstart', e => {
             e.dataTransfer.setData('text/plain', String(i));
           });
+          el.addEventListener('dblclick', () => {
+            const emptySlot = document.querySelector('#trade-your-offer .trade-offer-slot:not(.has-item)');
+            if (emptySlot) this._tradeDropItemToOffer(i, emptySlot);
+          });
         }
       }
       grid.appendChild(el);
     }
-
-    // Set up drop targets on your offer slots
-    const offerSlots = document.querySelectorAll('#trade-your-offer .trade-offer-slot');
-    offerSlots.forEach(slot => {
-      slot.addEventListener('dragover', e => {
-        if (slot.classList.contains('has-item')) return;
-        e.preventDefault();
-        slot.classList.add('drop-target');
-      });
-      slot.addEventListener('dragleave', () => slot.classList.remove('drop-target'));
-      slot.addEventListener('drop', e => {
-        e.preventDefault();
-        slot.classList.remove('drop-target');
-        if (slot.classList.contains('has-item')) return;
-        const invIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
-        this._tradeDropItemToOffer(invIdx, slot);
-      });
-    });
   },
 
   _tradeDropItemToOffer(invIdx, slot) {
@@ -526,8 +512,29 @@ const UI = {
     // Remove drag ability from that inv slot
     this._renderTradeLocalGrid();
 
-    // Notify game layer so it can send trade_offer to server
+    // dblclick on offer slot removes it back to inventory
+    slot.addEventListener('dblclick', () => this._removeFromOffer(slot, invIdx));
+
+    // Notify game layer (include invIdx for local removal on complete)
     const offerPayload = this._tradeYourOfferItems.map(o => ({
+      invIdx: o.invIdx,
+      name:   o.item.name,
+      slot:   o.item.slot,
+      amount: o.qty !== null ? o.qty : (o.item.amount ?? 1),
+    }));
+    if (this._tradeOnOffer) this._tradeOnOffer(offerPayload);
+  },
+
+  _removeFromOffer(slot, invIdx) {
+    const idx = this._tradeYourOfferItems.findIndex(o => o.invIdx === invIdx);
+    if (idx !== -1) this._tradeYourOfferItems.splice(idx, 1);
+    this._tradeReserved.delete(invIdx);
+    slot.classList.remove('has-item');
+    slot.textContent = '';
+    slot.title = '';
+    this._renderTradeLocalGrid();
+    const offerPayload = this._tradeYourOfferItems.map(o => ({
+      invIdx: o.invIdx,
       name:   o.item.name,
       slot:   o.item.slot,
       amount: o.qty !== null ? o.qty : (o.item.amount ?? 1),
@@ -542,6 +549,19 @@ const UI = {
       const slot = document.createElement('div');
       slot.className = 'trade-offer-slot';
       slot.dataset.offerIdx = i;
+      slot.addEventListener('dragover', e => {
+        if (slot.classList.contains('has-item')) return;
+        e.preventDefault();
+        slot.classList.add('drop-target');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drop-target'));
+      slot.addEventListener('drop', e => {
+        e.preventDefault();
+        slot.classList.remove('drop-target');
+        if (slot.classList.contains('has-item')) return;
+        const invIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        this._tradeDropItemToOffer(invIdx, slot);
+      });
       area.appendChild(slot);
     }
   },

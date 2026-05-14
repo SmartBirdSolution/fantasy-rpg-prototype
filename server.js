@@ -273,20 +273,19 @@ wss.on('connection', ws => {
       }
 
       case 'trade_decline': {
-        // msg.sessionId may be a peer id (before session) or empty — just cancel pending
-        const pendingToId = tradePending.get(id);
-        if (pendingToId) {
-          const toWs = [...wsToPlayer.entries()].find(([, s]) => s.id === pendingToId)?.[0];
-          if (toWs) sendTo(toWs, { type: 'trade_declined' });
-          tradePending.delete(id);
+        // msg.sessionId = the original sender's player id (fromId)
+        const fromId = String(msg.sessionId || '');
+        if (fromId && tradePending.has(fromId)) {
+          const fromWs = [...wsToPlayer.entries()].find(([, s]) => s.id === fromId)?.[0];
+          if (fromWs) sendTo(fromWs, { type: 'trade_declined' });
+          tradePending.delete(fromId);
         }
-        // Also cancel by sessionId if already in session
-        const sid = msg.sessionId;
-        if (sid && tradeSessions.has(sid)) {
-          const ts = tradeSessions.get(sid);
+        // Also cancel by sessionId if already in an active session
+        if (fromId && tradeSessions.has(fromId)) {
+          const ts = tradeSessions.get(fromId);
           sendTo(ts.p1ws, { type: 'trade_cancelled' });
           sendTo(ts.p2ws, { type: 'trade_cancelled' });
-          tradeSessions.delete(sid);
+          tradeSessions.delete(fromId);
         }
         break;
       }
