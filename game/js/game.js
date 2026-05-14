@@ -52,6 +52,7 @@ class Game {
     this.worldScene = new WorldScene(this.canvas, this.player);
     this.worldScene.init();
     this.worldScene.onBattleStart = (e, idx) => this._startBattle(e, idx);
+    this.worldScene.onCityEnter   = () => this._enterCity();
     this.worldScene.onPeerClick   = (peerId, peerName, cx, cy) => {
       if (this.scene !== 'world') return;
       UI.showPlayerContextMenu(
@@ -62,6 +63,11 @@ class Game {
     };
 
     Network.sendJoin(race, cls, this.player.name);
+    Network.onCityPopulation = count => UI.updateCityPopulation(count);
+
+    document.getElementById('btn-leave-city').addEventListener('click', () => {
+      if (this.scene === 'city') this._leaveCity();
+    });
 
     // Hide DUEL button in single-player (file://) mode
     const btnDuel = document.getElementById('btn-duel');
@@ -113,6 +119,37 @@ class Game {
       this.scene = 'battle';
       this.battleScene.init();
 
+      UI.fadeIn(null);
+    });
+  }
+
+  // ── WORLD → CITY ─────────────────────────────────────────────────────
+  _enterCity() {
+    if (this.scene !== 'world') return;
+    this.scene = 'transitioning';
+    Network.sendCityEnter();
+    UI.fadeOut(() => {
+      UI.showScene('city');
+      UI.showCityUI(1); // server will push the real count via city_population
+      this.scene = 'city';
+      UI.fadeIn(null);
+    });
+  }
+
+  // ── CITY → WORLD ─────────────────────────────────────────────────────
+  _leaveCity() {
+    Network.sendCityLeave();
+    UI.fadeOut(() => {
+      // Place player at tile (34, 30) — just south of the village block
+      this.worldScene.px = 34 * TILE_SIZE + TILE_SIZE / 2;
+      this.worldScene.py = 34 * TILE_SIZE + TILE_SIZE / 2;
+      this.player.worldTileX = 34;
+      this.player.worldTileY = 34;
+      this.worldScene._snapCamera();
+      this.worldScene.startCityCooldown();
+      UI.showScene('world');
+      UI.updateWorldStats(this.player);
+      this.scene = 'world';
       UI.fadeIn(null);
     });
   }

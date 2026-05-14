@@ -19,6 +19,9 @@ const Network = {
   onDuelAttack:     null, // ({ attackerIsMe, dmg, timedOut, yourTurn, over, won, xpGained })
   onDuelForfeit:    null, // ({ xpGained })
 
+  // City callbacks (set by game layer)
+  onCityPopulation: null, // (count)
+
   // Trade callbacks (set by game layer)
   onTradeRequest:   null, // ({ fromId, fromName })
   onTradeDeclined:  null, // ()
@@ -128,6 +131,10 @@ const Network = {
       case 'trade_cancelled':
         if (this.onTradeCancelled) this.onTradeCancelled(msg);
         break;
+
+      case 'city_population':
+        if (this.onCityPopulation) this.onCityPopulation(msg.count);
+        break;
     }
   },
 
@@ -158,6 +165,15 @@ const Network = {
 
   sendDuelZone(sessionId, zone, defending) {
     this._send({ type: 'duel_zone', sessionId, zone, defending: !!defending });
+  },
+
+  // ── City senders ─────────────────────────────────────────────────────
+  sendCityEnter() {
+    this._send({ type: 'city_enter' });
+  },
+
+  sendCityLeave() {
+    this._send({ type: 'city_leave' });
   },
 
   // ── Trade senders ────────────────────────────────────────────────────

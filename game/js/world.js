@@ -17,6 +17,9 @@ class WorldScene {
     this.onBattleStart = null; // callback(enemy, enemyIdx)
     this._battleCooldown = 0;
 
+    this.onCityEnter = null; // callback()
+    this._cityCooldown = 0;
+
     this._keyDown = e => { this.keys[e.code] = true; };
     this._keyUp   = e => { this.keys[e.code] = false; };
     this.onPeerClick = null; // callback(peerId, peerName, canvasX, canvasY)
@@ -86,8 +89,13 @@ class WorldScene {
     this._battleCooldown = 1.5;
   }
 
+  startCityCooldown() {
+    this._cityCooldown = 1.5;
+  }
+
   update(dt) {
     if (this._battleCooldown > 0) this._battleCooldown -= dt;
+    if (this._cityCooldown > 0) this._cityCooldown -= dt;
     this._movePlayer(dt);
     this._lerpCamera();
 
@@ -98,7 +106,7 @@ class WorldScene {
       }
     }
 
-    if (this._battleCooldown <= 0) this._checkCollisions();
+    if (this._battleCooldown <= 0 && this._cityCooldown <= 0) this._checkCollisions();
   }
 
   _movePlayer(dt) {
@@ -155,6 +163,15 @@ class WorldScene {
       if (Math.hypot(this.px - ex, this.py - ey) < 26) {
         if (this.onBattleStart) this.onBattleStart(e, i);
         break;
+      }
+    }
+
+    // City entry check — fires when the player steps onto a VILLAGE tile
+    const tx = Math.floor(this.px / TILE_SIZE);
+    const ty = Math.floor(this.py / TILE_SIZE);
+    if (ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W) {
+      if (MAP_DATA[ty][tx] === TILE.VILLAGE) {
+        if (this.onCityEnter) this.onCityEnter();
       }
     }
   }
@@ -304,6 +321,7 @@ class WorldScene {
     const ctx = this.ctx;
     for (const p of Network.remotePlayers.values()) {
       if (!p.race) continue; // hasn't chosen character yet
+      if (p.scene === 'city') continue; // inside city — hidden from world map
 
       const color  = RACE_DATA[p.race]?.color  ?? '#e8c99a';
       const accent = RACE_DATA[p.race]?.accent ?? '#b89060';

@@ -50,6 +50,11 @@ const UI = {
       btnAdminHp:     document.getElementById('btn-admin-hp'),
       btnAdminBottle: document.getElementById('btn-admin-bottle'),
       btnAdminGold:   document.getElementById('btn-admin-gold'),
+
+      // City
+      cityUI:         document.getElementById('city-ui'),
+      cityPopulation: document.getElementById('city-population'),
+      btnLeaveCity:   document.getElementById('btn-leave-city'),
     };
     this._duelTimerHandle = null;
     this._duelStartTime   = 0;
@@ -76,10 +81,11 @@ const UI = {
   },
 
   // ── SCENE MANAGEMENT ──────────────────────────────────────────────
-  showScene(name) { // 'charselect' | 'world' | 'battle'
+  showScene(name) { // 'charselect' | 'world' | 'battle' | 'city'
     this._els.charSelectUI.style.display  = name === 'charselect' ? '' : 'none';
     this._els.worldUI.style.display       = name === 'world'      ? '' : 'none';
     this._els.battleUI.style.display      = name === 'battle'     ? '' : 'none';
+    this._els.cityUI.style.display        = name === 'city'       ? '' : 'none';
 
     // Action bar is only visible in the world scene
     if (name === 'world') {
@@ -594,10 +600,9 @@ const UI = {
 
     // Notify game layer (include invIdx for local removal on complete)
     const offerPayload = this._tradeYourOfferItems.map(o => ({
+      ...o.item,
       invIdx: o.invIdx,
-      name:   o.item.name,
-      slot:   o.item.slot,
-      amount: o.qty !== null ? o.qty : (o.item.amount ?? 1),
+      ...(o.qty !== null ? { amount: o.qty } : {}),
     }));
     if (this._tradeOnOffer) this._tradeOnOffer(offerPayload);
   },
@@ -611,10 +616,9 @@ const UI = {
     slot.title = '';
     this._renderTradeLocalGrid();
     const offerPayload = this._tradeYourOfferItems.map(o => ({
+      ...o.item,
       invIdx: o.invIdx,
-      name:   o.item.name,
-      slot:   o.item.slot,
-      amount: o.qty !== null ? o.qty : (o.item.amount ?? 1),
+      ...(o.qty !== null ? { amount: o.qty } : {}),
     }));
     if (this._tradeOnOffer) this._tradeOnOffer(offerPayload);
   },
@@ -697,6 +701,19 @@ const UI = {
 
   hideQtyModal() {
     document.getElementById('trade-qty-modal').style.display = 'none';
+  },
+
+  // ── CITY UI ───────────────────────────────────────────────────────
+  showCityUI(population) {
+    this.updateCityPopulation(population);
+  },
+
+  updateCityPopulation(count) {
+    this._els.cityPopulation.textContent = 'Population: ' + count;
+  },
+
+  hideCityUI() {
+    this._els.cityUI.style.display = 'none';
   },
 
   // ── GAME OVER ─────────────────────────────────────────────────────

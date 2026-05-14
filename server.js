@@ -52,6 +52,9 @@ const wsToPlayer = new Map();   // ws → playerState
 const enemyLocks = new Map();   // enemyIdx → playerId  (currently in battle)
 const defeated   = new Set();   // enemyIdx (permanently defeated this session)
 
+// ── City state ────────────────────────────────────────────────────────────────
+const cityPlayers = new Set();  // player IDs currently inside the city
+
 // ── Trade state ───────────────────────────────────────────────────────────────
 const tradeSessions  = new Map();  // sessionId → { p1ws, p2ws, p1offer, p2offer, p1confirmed, p2confirmed }
 const tradePending   = new Map();  // fromId → toId  (unaccepted requests)
@@ -263,6 +266,30 @@ wss.on('connection', ws => {
         break;
       }
 
+      case 'city_enter': {
+        cityPlayers.add(id);
+        state.scene = 'city';
+        broadcast({ type: 'player_update', player: { id, name: state.name, race: state.race,
+          cls: state.cls, x: state.x, y: state.y, scene: 'city', fightingEnemy: null } }, ws);
+        for (const [w, s] of wsToPlayer) {
+          if (cityPlayers.has(s.id)) sendTo(w, { type: 'city_population', count: cityPlayers.size });
+        }
+        console.log(`  Player ${id} entered city  (city pop: ${cityPlayers.size})`);
+        break;
+      }
+
+      case 'city_leave': {
+        cityPlayers.delete(id);
+        state.scene = 'world';
+        broadcast({ type: 'player_update', player: { id, name: state.name, race: state.race,
+          cls: state.cls, x: state.x, y: state.y, scene: 'world', fightingEnemy: null } }, ws);
+        for (const [w, s] of wsToPlayer) {
+          if (cityPlayers.has(s.id)) sendTo(w, { type: 'city_population', count: cityPlayers.size });
+        }
+        console.log(`  Player ${id} left city  (city pop: ${cityPlayers.size})`);
+        break;
+      }
+
       case 'trade_request': {
         const toId = String(msg.toId);
         const toWs = [...wsToPlayer.entries()].find(([, s]) => s.id === toId)?.[0];
@@ -371,6 +398,13 @@ wss.on('connection', ws => {
         sendTo(other.ws, { type: 'duel_forfeit', xpGained: xp });
         duelSessions.delete(sid);
         break;
+      }
+    }
+    // Remove from city if they were inside
+    if (cityPlayers.has(id)) {
+      cityPlayers.delete(id);
+      for (const [w, s] of wsToPlayer) {
+        if (w !== ws && cityPlayers.has(s.id)) sendTo(w, { type: 'city_population', count: cityPlayers.size });
       }
     }
     // Cancel any pending trade requests from this player
