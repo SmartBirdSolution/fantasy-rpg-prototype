@@ -4,18 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Running the Projects
 
-Both projects are pure browser games — no build step, no server, no package manager.
+**Tic Tac Toe:** double-click `tictactoe.html` — standalone, no server needed.
 
-- **Open the RPG:** double-click `game/index.html` or run `start game/index.html` (Windows)
-- **Open Tic Tac Toe:** double-click `tictactoe.html`
+**Fantasy RPG — single player:** double-click `game/index.html` (file://, no network sync).
 
-There are no tests, linters, or build commands. Verify changes by opening the file in a browser and playing through the affected flow.
+**Fantasy RPG — multiplayer server:**
+```
+npm install       # first time only — installs the 'ws' package
+node server.js    # or: npm start
+```
+The console prints both `http://localhost:3000` and the LAN IP (e.g. `http://192.168.x.x:3000`).  
+Share the LAN IP with other machines on the same WiFi/network. All browsers connect to the same server, see each other's characters, and share enemy state. The game still works as single-player when opened as `file://` — `network.js` skips the connection automatically.
+
+There are no tests or linters. Verify changes by running the server (or opening `index.html`) and playing through the affected flow.
 
 ## Fantasy RPG Architecture (`game/`)
 
 ### Script load order (defined in `index.html`)
 ```
-data.js → character.js → world.js → battle.js → ui.js → game.js
+data.js → character.js → world.js → battle.js → ui.js → network.js → game.js
 ```
 All files use `'use strict'` and expose globals (no modules). Each file depends on globals from earlier files. Always maintain this order.
 
@@ -37,6 +44,9 @@ For world-map sprites (`drawWorldSprite`, `drawWorldPlayer`), a `scale(0.55)` ce
 
 ### UI layer (`ui.js`)
 `UI` is a plain object (not a class) with an `init()` that caches all DOM element references into `UI._els`. It manages scene visibility (`showScene`), fade transitions, HP bar updates, the battle log, and the character select builder. The battle log auto-scrolls and caps at 40 lines.
+
+### Network layer (`network.js` + `server.js`)
+`Network` is a global plain object. `Network.connect()` is called once on game start; it no-ops when opened as `file://`. The server (Node.js HTTP + `ws` WebSocket) tracks player positions, enemy locks (one player per enemy at a time), and defeated enemies for the session. The `WorldScene` checks `Network.isEnemyLocked(idx)` and `Network.isEnemyDefeated(idx)` before allowing collision. Enemy indices are their position in `ENEMY_SPAWNS` — stable and used as the network ID. The `onBattleStart(enemy, idx)` callback now takes two arguments; `game.js` passes `idx` to `Network.sendBattleStart` and `Network.sendBattleEnd`.
 
 ### Map layout
 The 60×60 map has impassable mountain borders. Player starts at tile (30, 30) (road intersection / village center). Enemy difficulty zones: top-left forest = easy (Goblin/Wolf), bottom sand = mid (Bandit/Skeleton), top-right mountains = hard (Troll/Dragon). Enemy `spawnTX/spawnTY` are tile coordinates; pixel position = `tx * TILE_SIZE + TILE_SIZE/2`.

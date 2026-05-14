@@ -1,0 +1,108 @@
+'use strict';
+
+const Network = {
+  socket:         null,
+  myId:           null,
+  connected:      false,
+
+  remotePlayers:  new Map(),  // id → { id, name, race, cls, x, y, scene, fightingEnemy }
+  lockedEnemies:  new Map(),  // enemyIdx → playerId
+  defeatedEnemies: new Set(), // enemy indices permanently defeated this session
+
+  // Set by game layer to react to server events
+  onReady:          null, // ()
+  onPlayersChanged: null, // ()
+  onEnemyLocked:    null, // (idx)
+  onEnemyUnlocked:  null, // (idx, wasDefeated)
+  onBattleDenied:   null, // (reason)
+
+  // Connect using the page's own host (works for localhost and LAN IPs alike)
+  connect() {
+    if (window.location.protocol === 'file:') return; // single-player / offline
+    const url = `ws://${window.location.host}`;
+    try {
+      this.socket = new WebSocket(url);
+    } catch {
+      return;
+    }
+
+    this.socket.onopen  = () => { this.connected = true; };
+    this.socket.onclose = () => { this.connected = false; };
+    this.socket.onerror = () => {};
+    this.socket.onmessage = ev => {
+      try { this._handle(JSON.parse(ev.data)); } catch {}
+    };
+  },
+
+  _handle(msg) {
+    switch (msg.type) {
+
+      case 'welcome':
+        this.myId = msg.id;
+        for (const p of msg.players) this.remotePlayers.set(p.id, p);
+        for (const [k, v] of Object.entries(msg.locks)) this.lockedEnemies.set(Number(k), v);
+        for (const idx of msg.defeated) this.defeatedEnemies.add(idx);
+        if (this.onReady) this.onReady();
+        if (this.onPlayersChanged) this.onPlayersChanged();
+        break;
+
+      case 'player_join':
+        this.remotePlayers.set(msg.player.id, msg.player);
+        if (this.onPlayersChanged) this.onPlayersChanged();
+        break;
+
+      case 'player_update':
+        if (msg.player.id === this.myId) break;
+        this.remotePlayers.set(msg.player.id, msg.player);
+        if (this.onPlayersChanged) this.onPlayersChanged();
+        break;
+
+      case 'player_left':
+        this.remotePlayers.delete(msg.id);
+        if (this.onPlayersChanged) this.onPlayersChanged();
+        break;
+
+      case 'enemy_locked':
+        this.lockedEnemies.set(msg.enemyIdx, msg.byId);
+        if (this.onEnemyLocked) this.onEnemyLocked(msg.enemyIdx);
+        break;
+
+      case 'enemy_unlocked':
+        this.lockedEnemies.delete(msg.enemyIdx);
+        if (msg.defeated) this.defeatedEnemies.add(msg.enemyIdx);
+        if (this.onEnemyUnlocked) this.onEnemyUnlocked(msg.enemyIdx, msg.defeated);
+        break;
+
+      case 'battle_denied':
+        if (this.onBattleDenied) this.onBattleDenied(msg.reason);
+        break;
+    }
+  },
+
+  // ── Senders ──────────────────────────────────────────────────────────
+  sendJoin(race, cls, name) {
+    this._send({ type: 'join', race, cls, name });
+  },
+
+  sendMove(x, y, scene) {
+    this._send({ type: 'move', x, y, scene });
+  },
+
+  sendBattleStart(enemyIdx) {
+    this._send({ type: 'battle_start', enemyIdx });
+  },
+
+  sendBattleEnd(enemyIdx, won) {
+    this._send({ type: 'battle_end', enemyIdx, won });
+  },
+
+  // ── Queries ──────────────────────────────────────────────────────────
+  isEnemyLocked(idx)   { return this.lockedEnemies.has(idx); },
+  isEnemyDefeated(idx) { return this.defeatedEnemies.has(idx); },
+
+  _send(msg) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(msg));
+    }
+  },
+};

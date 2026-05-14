@@ -6,29 +6,35 @@ class WorldScene {
     this.ctx    = canvas.getContext('2d');
     this.player = player;
 
-    // Pixel position of player centre
     this.px = player.worldTileX * TILE_SIZE + TILE_SIZE / 2;
     this.py = player.worldTileY * TILE_SIZE + TILE_SIZE / 2;
 
-    // Camera offset (top-left corner of viewport in world space)
-    this.cam = { x: 0, y: 0 };
-
-    this.keys    = {};
+    this.cam   = { x: 0, y: 0 };
+    this.keys  = {};
     this.enemies = [];
-    this.speed   = 120; // pixels per second
+    this.speed   = 120;
 
-    this.onBattleStart = null; // callback(enemy)
-    this._battleCooldown = 0;  // seconds after returning from battle
+    this.onBattleStart = null; // callback(enemy, enemyIdx)
+    this._battleCooldown = 0;
 
     this._keyDown = e => { this.keys[e.code] = true; };
     this._keyUp   = e => { this.keys[e.code] = false; };
   }
 
   init() {
-    this.enemies = ENEMY_SPAWNS.map(s => new EnemyCharacter(s.type, s.tx, s.ty));
+    this.enemies = ENEMY_SPAWNS.map((s, i) => {
+      const e = new EnemyCharacter(s.type, s.tx, s.ty);
+      e.idx = i; // stable network ID
+      return e;
+    });
+
+    // Apply server-known defeated enemies from this session
+    for (let i = 0; i < this.enemies.length; i++) {
+      if (Network.isEnemyDefeated(i)) this.enemies[i].defeated = true;
+    }
+
     window.addEventListener('keydown', this._keyDown);
     window.addEventListener('keyup',   this._keyUp);
-    // Snap camera immediately
     this._snapCamera();
   }
 
@@ -38,13 +44,21 @@ class WorldScene {
   }
 
   startBattleCooldown() {
-    this._battleCooldown = 1.5; // 1.5s grace after returning from battle
+    this._battleCooldown = 1.5;
   }
 
   update(dt) {
-    if (this._battleCooldown > 0) { this._battleCooldown -= dt; }
+    if (this._battleCooldown > 0) this._battleCooldown -= dt;
     this._movePlayer(dt);
     this._lerpCamera();
+
+    // Keep local defeated state in sync with network
+    for (let i = 0; i < this.enemies.length; i++) {
+      if (!this.enemies[i].defeated && Network.isEnemyDefeated(i)) {
+        this.enemies[i].defeated = true;
+      }
+    }
+
     if (this._battleCooldown <= 0) this._checkCollisions();
   }
 
@@ -69,9 +83,8 @@ class WorldScene {
   }
 
   _walkable(px, py) {
-    const hw = 10; // half-hitbox
-    const corners = [[-hw,-hw],[hw,-hw],[-hw,hw],[hw,hw]];
-    return corners.every(([ox,oy]) => {
+    const hw = 10;
+    return [[-hw,-hw],[hw,-hw],[-hw,hw],[hw,hw]].every(([ox,oy]) => {
       const tx = Math.floor((px + ox) / TILE_SIZE);
       const ty = Math.floor((py + oy) / TILE_SIZE);
       if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return false;
@@ -94,13 +107,14 @@ class WorldScene {
   }
 
   _checkCollisions() {
-    for (const e of this.enemies) {
+    for (let i = 0; i < this.enemies.length; i++) {
+      const e = this.enemies[i];
       if (e.defeated) continue;
+      if (Network.isEnemyLocked(i)) continue; // another player is fighting it
       const ex = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
       const ey = e.spawnTY * TILE_SIZE + TILE_SIZE / 2;
-      const dist = Math.hypot(this.px - ex, this.py - ey);
-      if (dist < 26) {
-        if (this.onBattleStart) this.onBattleStart(e);
+      if (Math.hypot(this.px - ex, this.py - ey) < 26) {
+        if (this.onBattleStart) this.onBattleStart(e, i);
         break;
       }
     }
@@ -116,6 +130,7 @@ class WorldScene {
 
     this._drawTiles();
     this._drawEnemies();
+    this._drawRemotePlayers();
     this._drawPlayer();
 
     ctx.restore();
@@ -138,12 +153,10 @@ class WorldScene {
         ctx.fillStyle = meta.color;
         ctx.fillRect(px, py, ts, ts);
 
-        // Subtle grid line
         ctx.strokeStyle = meta.border;
         ctx.lineWidth   = 0.4;
         ctx.strokeRect(px + 0.5, py + 0.5, ts - 1, ts - 1);
 
-        // Decorative details
         if (tileType === TILE.FOREST)   this._drawTree(ctx, px + ts/2, py + ts/2 - 2, tx, ty);
         if (tileType === TILE.MOUNTAIN) this._drawPeak(ctx, px + ts/2, py + ts);
         if (tileType === TILE.WATER)    this._drawWave(ctx, px, py, ts);
@@ -153,7 +166,6 @@ class WorldScene {
   }
 
   _drawTree(ctx, cx, cy, tx, ty) {
-    // Use tile coords as seed for consistent variation
     const seed = (tx * 7 + ty * 13) % 4;
     const h = 10 + seed * 2;
     ctx.fillStyle = '#0d3a18';
@@ -196,7 +208,7 @@ class WorldScene {
 
   _drawHouse(ctx, cx, cy, tx, ty) {
     const seed = (tx * 5 + ty * 11) % 3;
-    if (seed !== 0) return; // Only every 3rd village tile gets a house
+    if (seed !== 0) return;
     ctx.fillStyle = '#8a5a30';
     ctx.fillRect(cx - 8, cy - 4, 16, 10);
     ctx.fillStyle = '#c03020';
@@ -211,27 +223,72 @@ class WorldScene {
   }
 
   _drawEnemies() {
-    for (const e of this.enemies) {
+    const ctx = this.ctx;
+    for (let i = 0; i < this.enemies.length; i++) {
+      const e = this.enemies[i];
       if (e.defeated) continue;
+
       const ex = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
       const ey = e.spawnTY * TILE_SIZE + TILE_SIZE / 2 + 6;
+      const locked = Network.isEnemyLocked(i);
 
-      CharacterDrawer.drawWorldSprite(this.ctx, e.type, ex, ey);
+      // Dim locked enemies
+      if (locked) ctx.globalAlpha = 0.55;
+      CharacterDrawer.drawWorldSprite(ctx, e.type, ex, ey);
+      ctx.globalAlpha = 1;
 
       // Name label
-      this.ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      this.ctx.fillRect(ex - 20, ey - 26, 40, 12);
-      this.ctx.fillStyle = '#ffd';
-      this.ctx.font = '8px monospace';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText(e.type, ex, ey - 17);
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(ex - 20, ey - 26, 40, 12);
+      ctx.fillStyle = locked ? '#ff9933' : '#ffd';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.type, ex, ey - 17);
 
       // Level badge
-      this.ctx.fillStyle = '#e94560';
-      this.ctx.fillRect(ex - 8, ey - 36, 16, 10);
-      this.ctx.fillStyle = '#fff';
-      this.ctx.font = '7px monospace';
-      this.ctx.fillText('Lv' + e.level, ex, ey - 28);
+      ctx.fillStyle = locked ? '#cc4400' : '#e94560';
+      ctx.fillRect(ex - 8, ey - 36, 16, 10);
+      ctx.fillStyle = '#fff';
+      ctx.font = '7px monospace';
+      ctx.fillText('Lv' + e.level, ex, ey - 28);
+
+      // "IN BATTLE" indicator for locked enemies
+      if (locked) {
+        ctx.fillStyle = 'rgba(255,100,0,0.85)';
+        ctx.font = '11px monospace';
+        ctx.fillText('⚔', ex, ey - 44);
+      }
+    }
+  }
+
+  _drawRemotePlayers() {
+    const ctx = this.ctx;
+    for (const p of Network.remotePlayers.values()) {
+      if (!p.race) continue; // hasn't chosen character yet
+
+      const color  = RACE_DATA[p.race]?.color  ?? '#e8c99a';
+      const accent = RACE_DATA[p.race]?.accent ?? '#b89060';
+
+      const inBattle = p.scene === 'battle';
+      if (inBattle) ctx.globalAlpha = 0.6;
+
+      CharacterDrawer.drawWorldPlayer(ctx, p.x, p.y + 6, color, accent);
+      ctx.globalAlpha = 1;
+
+      // Name tag (different colour from local player)
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(p.x - 22, p.y - 24, 44, 12);
+      ctx.fillStyle = '#88ccaa';
+      ctx.font      = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, p.x, p.y - 15);
+
+      // Battle indicator above name
+      if (inBattle) {
+        ctx.fillStyle = 'rgba(255,140,0,0.9)';
+        ctx.font      = '11px monospace';
+        ctx.fillText('⚔', p.x, p.y - 30);
+      }
     }
   }
 
@@ -244,7 +301,6 @@ class WorldScene {
       this.player.accent
     );
 
-    // Player name tag
     this.ctx.fillStyle = 'rgba(0,0,0,0.55)';
     this.ctx.fillRect(this.px - 22, this.py - 24, 44, 12);
     this.ctx.fillStyle = '#a8dadc';
