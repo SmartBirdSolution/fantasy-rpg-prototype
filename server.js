@@ -52,6 +52,11 @@ const wsToPlayer = new Map();   // ws → playerState
 const enemyLocks = new Map();   // enemyIdx → playerId  (currently in battle)
 const defeated   = new Set();   // enemyIdx (permanently defeated this session)
 
+// ── Trade state ───────────────────────────────────────────────────────────────
+const tradeSessions  = new Map();  // sessionId → { p1ws, p2ws, p1offer, p2offer, p1confirmed, p2confirmed }
+const tradePending   = new Map();  // fromId → toId  (unaccepted requests)
+let   nextTradeId    = 1;
+
 // ── Duel state ────────────────────────────────────────────────────────────────
 const duelQueue    = [];         // [{ ws, id, stats }]
 const duelSessions = new Map();  // sessionId → { p1, p2, activeId, turnTimer }
@@ -257,6 +262,93 @@ wss.on('connection', ws => {
         resolveDuelTurn(sessionId, dmg, false);
         break;
       }
+
+      case 'trade_request': {
+        const toId = String(msg.toId);
+        const toWs = [...wsToPlayer.entries()].find(([, s]) => s.id === toId)?.[0];
+        if (!toWs) break;
+        tradePending.set(id, toId);
+        sendTo(toWs, { type: 'trade_request', fromId: id, fromName: state.name });
+        break;
+      }
+
+      case 'trade_decline': {
+        // msg.sessionId may be a peer id (before session) or empty — just cancel pending
+        const pendingToId = tradePending.get(id);
+        if (pendingToId) {
+          const toWs = [...wsToPlayer.entries()].find(([, s]) => s.id === pendingToId)?.[0];
+          if (toWs) sendTo(toWs, { type: 'trade_declined' });
+          tradePending.delete(id);
+        }
+        // Also cancel by sessionId if already in session
+        const sid = msg.sessionId;
+        if (sid && tradeSessions.has(sid)) {
+          const ts = tradeSessions.get(sid);
+          sendTo(ts.p1ws, { type: 'trade_cancelled' });
+          sendTo(ts.p2ws, { type: 'trade_cancelled' });
+          tradeSessions.delete(sid);
+        }
+        break;
+      }
+
+      case 'trade_accept': {
+        // msg.sessionId here is actually the fromId (sender's player id)
+        const fromId = String(msg.sessionId);
+        const fromWs = [...wsToPlayer.entries()].find(([, s]) => s.id === fromId)?.[0];
+        if (!fromWs) break;
+        tradePending.delete(fromId);
+        const sid = String(nextTradeId++);
+        const sess = { p1ws: fromWs, p2ws: ws, p1offer: [], p2offer: [],
+                       p1confirmed: false, p2confirmed: false };
+        tradeSessions.set(sid, sess);
+        sendTo(fromWs, { type: 'trade_accepted', sessionId: sid });
+        sendTo(ws,     { type: 'trade_accepted', sessionId: sid });
+        console.log(`  Trade ${sid}: Player ${fromId} ↔ Player ${id}`);
+        break;
+      }
+
+      case 'trade_offer': {
+        const sid  = msg.sessionId;
+        const sess = tradeSessions.get(sid);
+        if (!sess) break;
+        const isP1 = sess.p1ws === ws;
+        if (isP1) sess.p1offer = msg.items || [];
+        else      sess.p2offer = msg.items || [];
+        const otherWs = isP1 ? sess.p2ws : sess.p1ws;
+        sendTo(otherWs, { type: 'trade_peer_offer', items: isP1 ? sess.p1offer : sess.p2offer });
+        break;
+      }
+
+      case 'trade_confirm': {
+        const sid  = msg.sessionId;
+        const sess = tradeSessions.get(sid);
+        if (!sess) break;
+        const isP1 = sess.p1ws === ws;
+        if (isP1) sess.p1confirmed = true;
+        else      sess.p2confirmed = true;
+        // Notify the other player that their peer confirmed
+        const otherWs = isP1 ? sess.p2ws : sess.p1ws;
+        sendTo(otherWs, { type: 'trade_peer_confirmed' });
+        // If both confirmed, execute the swap
+        if (sess.p1confirmed && sess.p2confirmed) {
+          sendTo(sess.p1ws, { type: 'trade_complete', receivedItems: sess.p2offer });
+          sendTo(sess.p2ws, { type: 'trade_complete', receivedItems: sess.p1offer });
+          tradeSessions.delete(sid);
+          console.log(`  Trade ${sid} completed`);
+        }
+        break;
+      }
+
+      case 'trade_cancel': {
+        const sid = msg.sessionId;
+        if (sid && tradeSessions.has(sid)) {
+          const ts = tradeSessions.get(sid);
+          sendTo(ts.p1ws, { type: 'trade_cancelled' });
+          sendTo(ts.p2ws, { type: 'trade_cancelled' });
+          tradeSessions.delete(sid);
+        }
+        break;
+      }
     }
   });
 
@@ -279,6 +371,17 @@ wss.on('connection', ws => {
         const xp = Math.round(other.stats.level * 20 + 10);
         sendTo(other.ws, { type: 'duel_forfeit', xpGained: xp });
         duelSessions.delete(sid);
+        break;
+      }
+    }
+    // Cancel any pending trade requests from this player
+    tradePending.delete(id);
+    // Cancel any active trade sessions involving this player
+    for (const [sid, ts] of tradeSessions) {
+      if (ts.p1ws === ws || ts.p2ws === ws) {
+        const otherWs = ts.p1ws === ws ? ts.p2ws : ts.p1ws;
+        sendTo(otherWs, { type: 'trade_cancelled' });
+        tradeSessions.delete(sid);
         break;
       }
     }

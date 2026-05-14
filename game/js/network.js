@@ -19,6 +19,15 @@ const Network = {
   onDuelAttack:     null, // ({ attackerIsMe, dmg, timedOut, yourTurn, over, won, xpGained })
   onDuelForfeit:    null, // ({ xpGained })
 
+  // Trade callbacks (set by game layer)
+  onTradeRequest:   null, // ({ fromId, fromName })
+  onTradeDeclined:  null, // ()
+  onTradeAccepted:  null, // ({ sessionId })
+  onTradePeerOffer:      null, // ({ items })
+  onTradePeerConfirmed:  null, // ()
+  onTradeComplete:       null, // ({ receivedItems })
+  onTradeCancelled:      null, // ()
+
   // Connect using the page's own host (works for localhost and LAN IPs alike)
   connect() {
     if (window.location.protocol === 'file:') return; // single-player / offline
@@ -91,6 +100,34 @@ const Network = {
       case 'duel_forfeit':
         if (this.onDuelForfeit) this.onDuelForfeit(msg);
         break;
+
+      case 'trade_request':
+        if (this.onTradeRequest) this.onTradeRequest(msg);
+        break;
+
+      case 'trade_declined':
+        if (this.onTradeDeclined) this.onTradeDeclined(msg);
+        break;
+
+      case 'trade_accepted':
+        if (this.onTradeAccepted) this.onTradeAccepted(msg);
+        break;
+
+      case 'trade_peer_offer':
+        if (this.onTradePeerOffer) this.onTradePeerOffer(msg);
+        break;
+
+      case 'trade_peer_confirmed':
+        if (this.onTradePeerConfirmed) this.onTradePeerConfirmed(msg);
+        break;
+
+      case 'trade_complete':
+        if (this.onTradeComplete) this.onTradeComplete(msg);
+        break;
+
+      case 'trade_cancelled':
+        if (this.onTradeCancelled) this.onTradeCancelled(msg);
+        break;
     }
   },
 
@@ -121,6 +158,31 @@ const Network = {
 
   sendDuelZone(sessionId, zone, defending) {
     this._send({ type: 'duel_zone', sessionId, zone, defending: !!defending });
+  },
+
+  // ── Trade senders ────────────────────────────────────────────────────
+  sendTradeRequest(toId) {
+    this._send({ type: 'trade_request', toId });
+  },
+
+  sendTradeDecline(sessionId) {
+    this._send({ type: 'trade_decline', sessionId });
+  },
+
+  sendTradeAccept(sessionId) {
+    this._send({ type: 'trade_accept', sessionId });
+  },
+
+  sendTradeOffer(sessionId, items) {
+    this._send({ type: 'trade_offer', sessionId, items });
+  },
+
+  sendTradeConfirm(sessionId) {
+    this._send({ type: 'trade_confirm', sessionId });
+  },
+
+  sendTradeCancel(sessionId) {
+    this._send({ type: 'trade_cancel', sessionId });
   },
 
   // ── Queries ──────────────────────────────────────────────────────────

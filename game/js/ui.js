@@ -51,6 +51,8 @@ const UI = {
       const menu = document.getElementById('inv-context-menu');
       if (!menu.contains(e.target)) menu.style.display = 'none';
     });
+
+    this.initEffectsPanel();
   },
 
   // ── SCENE MANAGEMENT ──────────────────────────────────────────────
@@ -363,6 +365,243 @@ const UI = {
     menu.style.display = 'flex';
   },
 
+  // ── PLAYER CONTEXT MENU ───────────────────────────────────────────
+  showPlayerContextMenu(peerId, peerName, x, y, onChat, onTrade) {
+    const menu = document.getElementById('player-context-menu');
+    document.getElementById('player-ctx-name').textContent = peerName;
+    document.getElementById('player-ctx-chat').onclick = () => {
+      this.hidePlayerContextMenu();
+      if (onChat) onChat();
+    };
+    document.getElementById('player-ctx-trade').onclick = () => {
+      this.hidePlayerContextMenu();
+      if (onTrade) onTrade();
+    };
+    menu.style.left    = x + 4 + 'px';
+    menu.style.top     = y + 4 + 'px';
+    menu.style.display = 'flex';
+    this._playerCtxOpenId = peerId;
+  },
+
+  hidePlayerContextMenu() {
+    document.getElementById('player-context-menu').style.display = 'none';
+    this._playerCtxOpenId = null;
+  },
+
+  // ── TRADE REQUEST (receiver) ───────────────────────────────────────
+  showTradeRequest(fromName, onAccept, onDecline) {
+    document.getElementById('trade-request-msg').textContent =
+      `${fromName} wants to trade with you.`;
+    document.getElementById('btn-trade-accept').onclick = () => {
+      document.getElementById('trade-request-popup').style.display = 'none';
+      if (onAccept) onAccept();
+    };
+    document.getElementById('btn-trade-decline').onclick = () => {
+      document.getElementById('trade-request-popup').style.display = 'none';
+      if (onDecline) onDecline();
+    };
+    document.getElementById('trade-request-popup').style.display = 'flex';
+  },
+
+  // ── TRADE WAITING (sender) ─────────────────────────────────────────
+  showTradeWaiting(toName, onCancel) {
+    document.getElementById('trade-waiting-msg').textContent =
+      `Waiting for ${toName}…`;
+    document.getElementById('btn-trade-cancel-wait').onclick = () => {
+      this.hideTradeWaiting();
+      if (onCancel) onCancel();
+    };
+    document.getElementById('trade-waiting-popup').style.display = 'flex';
+  },
+
+  hideTradeWaiting() {
+    document.getElementById('trade-waiting-popup').style.display = 'none';
+  },
+
+  // ── TRADE WINDOW ──────────────────────────────────────────────────
+  openTradeWindow(localPlayer, peerName, onOffer, onConfirm, onCancel) {
+    this._tradeLocalPlayer  = localPlayer;
+    this._tradeOnOffer      = onOffer;
+    this._tradeOnConfirm    = onConfirm;
+    this._tradeOnCancel     = onCancel;
+    this._tradeReserved     = new Set(); // inventory indices reserved in offer
+    this._tradeYourOfferItems = []; // array of { invIdx, item, qty? }
+
+    document.getElementById('trade-peer-label').textContent =
+      peerName.toUpperCase() + "'S BAG";
+    document.getElementById('trade-peer-confirmed').style.display = 'none';
+    document.getElementById('btn-trade-confirm').classList.remove('confirmed');
+
+    this._renderTradeLocalGrid();
+    this._renderTradeYourOffer();
+    this._renderTradePeerOffer([]);
+
+    // Clear peer grid (unknown until they send their bag)
+    document.getElementById('trade-peer-grid').innerHTML = '';
+
+    document.getElementById('btn-trade-confirm').onclick = () => {
+      document.getElementById('btn-trade-confirm').classList.add('confirmed');
+      if (onConfirm) onConfirm();
+    };
+
+    document.getElementById('btn-trade-close').onclick = () => {
+      this.closeTradeWindow();
+      if (onCancel) onCancel();
+    };
+
+    document.getElementById('trade-window').style.display = 'flex';
+  },
+
+  _renderTradeLocalGrid() {
+    const player = this._tradeLocalPlayer;
+    const grid   = document.getElementById('trade-local-grid');
+    grid.innerHTML = '';
+    for (let i = 0; i < 100; i++) {
+      const item = player.inventory[i];
+      const el   = document.createElement('div');
+      const reserved = this._tradeReserved.has(i);
+      el.className = 'trade-inv-slot' +
+        (item ? ' has-item' : '') +
+        (reserved ? ' reserved' : '');
+      if (item) {
+        el.title     = item.slot === 'gold' ? `Gold: ${item.amount}` : item.name;
+        el.textContent = item.slot === 'gold'
+          ? `${item.amount}G`
+          : item.name.slice(0, 4);
+        if (!reserved) {
+          el.draggable = true;
+          el.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/plain', String(i));
+          });
+        }
+      }
+      grid.appendChild(el);
+    }
+
+    // Set up drop targets on your offer slots
+    const offerSlots = document.querySelectorAll('#trade-your-offer .trade-offer-slot');
+    offerSlots.forEach(slot => {
+      slot.addEventListener('dragover', e => {
+        if (slot.classList.contains('has-item')) return;
+        e.preventDefault();
+        slot.classList.add('drop-target');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drop-target'));
+      slot.addEventListener('drop', e => {
+        e.preventDefault();
+        slot.classList.remove('drop-target');
+        if (slot.classList.contains('has-item')) return;
+        const invIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        this._tradeDropItemToOffer(invIdx, slot);
+      });
+    });
+  },
+
+  _tradeDropItemToOffer(invIdx, slot) {
+    const player = this._tradeLocalPlayer;
+    const item   = player.inventory[invIdx];
+    if (!item || this._tradeReserved.has(invIdx)) return;
+
+    // Stackable (gold)?
+    if (item.slot === 'gold' && item.amount > 1) {
+      this.showQtyModal(item.amount, qty => {
+        this._commitTradeOffer(invIdx, item, qty, slot);
+      });
+    } else {
+      this._commitTradeOffer(invIdx, item, null, slot);
+    }
+  },
+
+  _commitTradeOffer(invIdx, item, qty, slot) {
+    this._tradeReserved.add(invIdx);
+    this._tradeYourOfferItems.push({ invIdx, item, qty });
+
+    const label = item.slot === 'gold'
+      ? `${qty !== null ? qty : item.amount}G`
+      : item.name.slice(0, 4);
+    slot.classList.add('has-item');
+    slot.textContent = label;
+    slot.title       = item.slot === 'gold' ? `Gold: ${qty || item.amount}` : item.name;
+
+    // Remove drag ability from that inv slot
+    this._renderTradeLocalGrid();
+
+    // Notify game layer so it can send trade_offer to server
+    const offerPayload = this._tradeYourOfferItems.map(o => ({
+      name:   o.item.name,
+      slot:   o.item.slot,
+      amount: o.qty !== null ? o.qty : (o.item.amount ?? 1),
+    }));
+    if (this._tradeOnOffer) this._tradeOnOffer(offerPayload);
+  },
+
+  _renderTradeYourOffer() {
+    const area = document.getElementById('trade-your-offer');
+    area.innerHTML = '';
+    for (let i = 0; i < 8; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'trade-offer-slot';
+      slot.dataset.offerIdx = i;
+      area.appendChild(slot);
+    }
+  },
+
+  _renderTradePeerOffer(items) {
+    const area = document.getElementById('trade-peer-offer');
+    area.innerHTML = '';
+    for (let i = 0; i < 8; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'trade-offer-slot' + (items[i] ? ' has-item' : '');
+      if (items[i]) {
+        const it = items[i];
+        slot.textContent = it.slot === 'gold'
+          ? `${it.amount}G`
+          : (it.name || '').slice(0, 4);
+        slot.title = it.name || '';
+      }
+      area.appendChild(slot);
+    }
+  },
+
+  updatePeerOffer(items) {
+    this._renderTradePeerOffer(items || []);
+  },
+
+  setPeerConfirmed(confirmed) {
+    const el = document.getElementById('trade-peer-confirmed');
+    el.style.display = confirmed ? '' : 'none';
+  },
+
+  closeTradeWindow() {
+    document.getElementById('trade-window').style.display = 'none';
+    this._tradeLocalPlayer    = null;
+    this._tradeOnOffer        = null;
+    this._tradeOnConfirm      = null;
+    this._tradeOnCancel       = null;
+    this._tradeReserved       = null;
+    this._tradeYourOfferItems = null;
+  },
+
+  // ── QTY MODAL ─────────────────────────────────────────────────────
+  showQtyModal(max, onConfirm) {
+    const input = document.getElementById('trade-qty-input');
+    input.max   = max;
+    input.value = max;
+    document.getElementById('btn-qty-confirm').onclick = () => {
+      const v = Math.max(1, Math.min(max, parseInt(input.value, 10) || 1));
+      this.hideQtyModal();
+      if (onConfirm) onConfirm(v);
+    };
+    document.getElementById('btn-qty-cancel').onclick = () => this.hideQtyModal();
+    document.getElementById('trade-qty-modal').style.display = 'flex';
+    input.focus();
+    input.select();
+  },
+
+  hideQtyModal() {
+    document.getElementById('trade-qty-modal').style.display = 'none';
+  },
+
   // ── GAME OVER ─────────────────────────────────────────────────────
   showGameOver(onRespawn) {
     this._els.gameoverOverlay.style.display = 'flex';
@@ -370,5 +609,40 @@ const UI = {
       this._els.gameoverOverlay.style.display = 'none';
       onRespawn();
     };
+  },
+
+  // ── EFFECTS PANEL ─────────────────────────────────────────────────
+  initEffectsPanel() {
+    const panel  = document.getElementById('effects-panel');
+    const handle = document.getElementById('effects-handle');
+    let dragging = false, ox = 0, oy = 0;
+    handle.addEventListener('mousedown', e => {
+      dragging = true;
+      ox = e.clientX - panel.offsetLeft;
+      oy = e.clientY - panel.offsetTop;
+      handle.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      panel.style.left   = (e.clientX - ox) + 'px';
+      panel.style.top    = (e.clientY - oy) + 'px';
+      panel.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', () => {
+      dragging = false;
+      handle.style.cursor = 'grab';
+    });
+  },
+
+  updateEffectsPanel(player) {
+    const list = document.getElementById('effects-list');
+    list.innerHTML = '';
+    if (player._hotRemaining > 0) {
+      const el = document.createElement('div');
+      el.className = 'effect-entry effect-hot';
+      el.textContent = `Regen ${Math.ceil(player._hotRemaining)}s`;
+      list.appendChild(el);
+    }
   },
 };

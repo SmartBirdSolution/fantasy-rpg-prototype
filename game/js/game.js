@@ -18,6 +18,11 @@ class Game {
     this._netTimer   = 0;
     this._regenAccum = 0;
     this._hotAccum   = 0;
+
+    // Trade state
+    this._tradeSession    = null; // { sessionId, peerId, peerName, isSender }
+    this._tradePendingId  = null; // peerId we sent a request to, before session exists
+    this._tradePendingName = null;
   }
 
   start() {
@@ -26,6 +31,7 @@ class Game {
 
     Network.connect();
     Network.onDuelStart = data => this._onDuelStart(data);
+    this._initTradeNetwork();
 
     UI.init();
     UI.showScene('charselect');
@@ -46,6 +52,14 @@ class Game {
     this.worldScene = new WorldScene(this.canvas, this.player);
     this.worldScene.init();
     this.worldScene.onBattleStart = (e, idx) => this._startBattle(e, idx);
+    this.worldScene.onPeerClick   = (peerId, peerName, cx, cy) => {
+      if (this.scene !== 'world') return;
+      UI.showPlayerContextMenu(
+        peerId, peerName, cx, cy,
+        () => { /* Private Chat placeholder – just close */ },
+        () => this._sendTradeRequest(peerId, peerName)
+      );
+    };
 
     Network.sendJoin(race, cls, this.player.name);
 
@@ -211,6 +225,89 @@ class Game {
     });
   }
 
+  // ── TRADE ────────────────────────────────────────────────────────────
+  _initTradeNetwork() {
+    Network.onTradeRequest = ({ fromId, fromName }) => {
+      if (this.scene !== 'world') {
+        Network.sendTradeDecline('');
+        return;
+      }
+      UI.showTradeRequest(fromName,
+        () => {
+          // Accept
+          this._tradePendingId   = fromId;
+          this._tradePendingName = fromName;
+          Network.sendTradeAccept(fromId);
+        },
+        () => Network.sendTradeDecline(fromId)
+      );
+    };
+
+    Network.onTradeDeclined = () => {
+      UI.hideTradeWaiting();
+      this._tradePendingId   = null;
+      this._tradePendingName = null;
+    };
+
+    Network.onTradeAccepted = ({ sessionId }) => {
+      const peerName = this._tradePendingName || 'Player';
+      this._tradeSession = { sessionId, peerName };
+      this._tradePendingId   = null;
+      this._tradePendingName = null;
+      UI.hideTradeWaiting();
+      UI.openTradeWindow(
+        this.player,
+        peerName,
+        items  => Network.sendTradeOffer(sessionId, items),
+        ()     => Network.sendTradeConfirm(sessionId),
+        ()     => { Network.sendTradeCancel(sessionId); this._tradeSession = null; }
+      );
+    };
+
+    Network.onTradePeerOffer = ({ items }) => {
+      UI.updatePeerOffer(items || []);
+    };
+
+    Network.onTradePeerConfirmed = () => {
+      UI.setPeerConfirmed(true);
+    };
+
+    Network.onTradeComplete = ({ receivedItems }) => {
+      if (receivedItems) {
+        for (const item of receivedItems) {
+          if (item.slot === 'gold') {
+            this.player.addGold(item.amount || 0);
+          } else {
+            this.player.addToInventory({ ...item });
+          }
+        }
+      }
+      UI.closeTradeWindow();
+      this._tradeSession = null;
+      UI.updateWorldStats(this.player);
+    };
+
+    Network.onTradeCancelled = () => {
+      UI.closeTradeWindow();
+      UI.hideTradeWaiting();
+      this._tradeSession     = null;
+      this._tradePendingId   = null;
+      this._tradePendingName = null;
+    };
+  }
+
+  _sendTradeRequest(peerId, peerName) {
+    if (this.scene !== 'world' || !Network.connected) return;
+    this._tradePendingId   = peerId;
+    this._tradePendingName = peerName;
+    Network.sendTradeRequest(peerId);
+    UI.showTradeWaiting(peerName, () => {
+      Network.sendTradeCancel('');
+      this._tradePendingId   = null;
+      this._tradePendingName = null;
+    });
+  }
+
   // ── MAIN LOOP ────────────────────────────────────────────────────────
   _loop(ts) {
     const dt = Math.min((ts - this.lastTime) / 1000, 0.05);
@@ -270,6 +367,8 @@ class Game {
       this.ctx.fillStyle = '#05081a';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
+
+    if (this.player) UI.updateEffectsPanel(this.player);
 
     requestAnimationFrame(nts => this._loop(nts));
   }

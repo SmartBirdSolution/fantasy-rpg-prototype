@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fantasy RPG</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=9">
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
@@ -135,16 +135,95 @@
       </div>
     </div>
 
+    <!-- PLAYER CONTEXT MENU -->
+    <div id="player-context-menu" style="display:none">
+      <div id="player-ctx-name"></div>
+      <button id="player-ctx-chat">Private Chat</button>
+      <button id="player-ctx-trade">Trade</button>
+    </div>
+
+    <!-- TRADE REQUEST POPUP (receiver) -->
+    <div id="trade-request-popup" style="display:none">
+      <div id="trade-request-box">
+        <div class="trade-popup-title">TRADE REQUEST</div>
+        <div id="trade-request-msg"></div>
+        <div class="trade-popup-buttons">
+          <button id="btn-trade-accept">Accept</button>
+          <button id="btn-trade-decline">Decline</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADE WAITING POPUP (sender) -->
+    <div id="trade-waiting-popup" style="display:none">
+      <div id="trade-waiting-box">
+        <div class="trade-popup-title">TRADE</div>
+        <div class="trade-search-ring"></div>
+        <div id="trade-waiting-msg"></div>
+        <button id="btn-trade-cancel-wait">Cancel</button>
+      </div>
+    </div>
+
+    <!-- TRADE WINDOW -->
+    <div id="trade-window" style="display:none">
+      <div id="trade-window-box">
+        <div id="trade-header">
+          <span class="trade-title">TRADE</span>
+          <button id="btn-trade-close">✕ CANCEL</button>
+        </div>
+        <div id="trade-body">
+          <!-- Left: local inventory -->
+          <div id="trade-local-col">
+            <div class="trade-section-label">YOUR BAG</div>
+            <div id="trade-local-grid"></div>
+          </div>
+          <!-- Centre: offer areas -->
+          <div id="trade-offer-col">
+            <div class="trade-section-label">YOUR OFFER</div>
+            <div id="trade-your-offer"></div>
+            <div class="trade-section-label" style="margin-top:10px">THEIR OFFER</div>
+            <div id="trade-peer-offer"></div>
+            <div id="trade-peer-confirmed" style="display:none">Peer confirmed ✓</div>
+            <div class="trade-confirm-row">
+              <button id="btn-trade-confirm">CONFIRM TRADE</button>
+            </div>
+          </div>
+          <!-- Right: peer's inventory display -->
+          <div id="trade-peer-col">
+            <div class="trade-section-label" id="trade-peer-label">THEIR BAG</div>
+            <div id="trade-peer-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADE QTY MODAL -->
+    <div id="trade-qty-modal" style="display:none">
+      <div id="trade-qty-box">
+        <div class="trade-popup-title">HOW MANY?</div>
+        <input id="trade-qty-input" type="number" min="1" value="1">
+        <div class="trade-popup-buttons">
+          <button id="btn-qty-confirm">OK</button>
+          <button id="btn-qty-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <!-- FADE OVERLAY -->
     <div id="fade-overlay"></div>
   </div>
 
-  <script src="js/data.js?v=7"></script>
-  <script src="js/character.js?v=7"></script>
-  <script src="js/world.js?v=7"></script>
-  <script src="js/battle.js?v=7"></script>
-  <script src="js/ui.js?v=7"></script>
-  <script src="js/network.js?v=7"></script>
-  <script src="js/game.js?v=7"></script>
+  <div id="effects-panel">
+    <div id="effects-handle" title="Drag to move">⠿</div>
+    <div id="effects-list"></div>
+  </div>
+
+  <script src="js/data.js?v=9"></script>
+  <script src="js/character.js?v=9"></script>
+  <script src="js/world.js?v=9"></script>
+  <script src="js/battle.js?v=9"></script>
+  <script src="js/ui.js?v=9"></script>
+  <script src="js/network.js?v=9"></script>
+  <script src="js/game.js?v=9"></script>
 </body>
 </html>

@@ -19,6 +19,8 @@ class WorldScene {
 
     this._keyDown = e => { this.keys[e.code] = true; };
     this._keyUp   = e => { this.keys[e.code] = false; };
+    this.onPeerClick = null; // callback(peerId, peerName, canvasX, canvasY)
+    this._canvasClick = e => this._handleCanvasClick(e);
   }
 
   init() {
@@ -35,12 +37,49 @@ class WorldScene {
 
     window.addEventListener('keydown', this._keyDown);
     window.addEventListener('keyup',   this._keyUp);
+    this.canvas.addEventListener('click', this._canvasClick);
     this._snapCamera();
   }
 
   destroy() {
     window.removeEventListener('keydown', this._keyDown);
     window.removeEventListener('keyup',   this._keyUp);
+    this.canvas.removeEventListener('click', this._canvasClick);
+  }
+
+  // Convert a canvas-space click to world coords and check proximity to peers
+  _handleCanvasClick(e) {
+    // Close context menu if already open and user clicks elsewhere
+    const menu = document.getElementById('player-context-menu');
+    if (menu.style.display !== 'none') {
+      UI.hidePlayerContextMenu();
+      return;
+    }
+
+    const rect   = this.canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    // Convert to world pixel coords (account for camera)
+    const worldX = clickX + this.cam.x;
+    const worldY = clickY + this.cam.y;
+
+    const PROXIMITY_PX = 2 * TILE_SIZE; // ~2 tiles
+    const HIT_RADIUS   = 20;            // pixel hit radius for avatar
+
+    for (const p of Network.remotePlayers.values()) {
+      if (!p.race) continue;
+      // p.x and p.y are world pixel coords (as sent by sendMove)
+      const dist = Math.hypot(worldX - p.x, worldY - p.y);
+      // Check proximity of LOCAL player to the remote peer
+      const localDist = Math.hypot(this.px - p.x, this.py - p.y);
+      if (dist < HIT_RADIUS && localDist < PROXIMITY_PX) {
+        if (this.onPeerClick) {
+          this.onPeerClick(p.id, p.name, e.clientX, e.clientY);
+        }
+        return;
+      }
+    }
   }
 
   startBattleCooldown() {
