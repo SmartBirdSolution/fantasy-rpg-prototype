@@ -174,16 +174,15 @@ class WorldScene {
       }
     }
 
-    // City entry: fire when player walks into the village bounding box (rows 27-33, cols 27-33)
-    const tx = Math.floor(this.px / TILE_SIZE);
-    const ty = Math.floor(this.py / TILE_SIZE);
-    if (tx >= 27 && tx <= 33 && ty >= 27 && ty <= 33 && !this._cityPromptShown) {
+    // City entry: only prompt when player is within 2 tiles of the gate center
+    const CITY_CX = 30 * TILE_SIZE + TILE_SIZE / 2; // world pixel center of city
+    const CITY_CY = 30 * TILE_SIZE + TILE_SIZE / 2;
+    const CITY_RADIUS = TILE_SIZE * 2; // ~2 tiles — must be right at the gate
+    if (Math.hypot(this.px - CITY_CX, this.py - CITY_CY) < CITY_RADIUS && !this._cityPromptShown) {
       this._cityPromptShown = true;
       if (this.onCityPrompt) {
-        // Pass the city's screen position so the menu appears near it
-        const ts = TILE_SIZE;
-        const screenX = (30 * ts + ts / 2) - this.cam.x; // center of village
-        const screenY = (30 * ts + ts / 2) - this.cam.y; // center of village
+        const screenX = CITY_CX - this.cam.x;
+        const screenY = CITY_CY - this.cam.y;
         this.onCityPrompt(screenX, screenY);
       }
     }
