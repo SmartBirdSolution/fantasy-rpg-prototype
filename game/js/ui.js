@@ -41,15 +41,35 @@ const UI = {
       duelPopup:     document.getElementById('duel-popup'),
       duelTimerTxt:  document.getElementById('duel-timer-text'),
       duelStatusTxt: document.getElementById('duel-status-text'),
+
+      // Action bar
+      actionBar:      document.getElementById('action-bar'),
+      btnBag:         document.getElementById('btn-bag'),
+      btnAdminToggle: document.getElementById('btn-admin-toggle'),
+      adminPanel:     document.getElementById('admin-panel'),
+      btnAdminHp:     document.getElementById('btn-admin-hp'),
+      btnAdminBottle: document.getElementById('btn-admin-bottle'),
+      btnAdminGold:   document.getElementById('btn-admin-gold'),
     };
     this._duelTimerHandle = null;
     this._duelStartTime   = 0;
     this._invPlayer       = null;
+    this._adminPanelOpen  = false;
 
     // Close inventory context menu when clicking anywhere in the popup
     document.getElementById('inventory-popup').addEventListener('click', e => {
       const menu = document.getElementById('inv-context-menu');
       if (!menu.contains(e.target)) menu.style.display = 'none';
+    });
+
+    // Close admin panel when clicking outside it and outside the toggle button
+    document.addEventListener('click', e => {
+      if (!this._adminPanelOpen) return;
+      const panel  = this._els.adminPanel;
+      const toggle = this._els.btnAdminToggle;
+      if (!panel.contains(e.target) && !toggle.contains(e.target)) {
+        this._closeAdminPanel();
+      }
     });
 
     this.initEffectsPanel();
@@ -60,6 +80,63 @@ const UI = {
     this._els.charSelectUI.style.display  = name === 'charselect' ? '' : 'none';
     this._els.worldUI.style.display       = name === 'world'      ? '' : 'none';
     this._els.battleUI.style.display      = name === 'battle'     ? '' : 'none';
+
+    // Action bar is only visible in the world scene
+    if (name === 'world') {
+      this._els.actionBar.style.display = 'flex';
+    } else {
+      this._els.actionBar.style.display = 'none';
+      this._closeAdminPanel();
+    }
+  },
+
+  // ── ACTION BAR ────────────────────────────────────────────────────
+  initActionBar(player, onOpenInventory) {
+    this._els.btnBag.onclick = () => {
+      if (onOpenInventory) onOpenInventory();
+    };
+
+    this._els.btnAdminToggle.onclick = () => {
+      this._toggleAdminPanel();
+    };
+
+    this._els.btnAdminHp.onclick = () => {
+      if (!player) return;
+      player.currentHP = Math.min(player.currentHP + 50, player.maxHP);
+      this.updateWorldStats(player);
+    };
+
+    this._els.btnAdminBottle.onclick = () => {
+      if (!player) return;
+      const template = EQUIPMENT_TEMPLATES.HealthBottle;
+      player.addToInventory({ ...template });
+    };
+
+    this._els.btnAdminGold.onclick = () => {
+      if (!player) return;
+      player.addGold(100);
+      this.updateWorldStats(player);
+    };
+  },
+
+  _toggleAdminPanel() {
+    if (this._adminPanelOpen) {
+      this._closeAdminPanel();
+    } else {
+      this._openAdminPanel();
+    }
+  },
+
+  _openAdminPanel() {
+    this._adminPanelOpen = true;
+    this._els.adminPanel.style.display = 'flex';
+    this._els.btnAdminToggle.classList.add('active');
+  },
+
+  _closeAdminPanel() {
+    this._adminPanelOpen = false;
+    this._els.adminPanel.style.display = 'none';
+    this._els.btnAdminToggle.classList.remove('active');
   },
 
   // ── FADE ──────────────────────────────────────────────────────────

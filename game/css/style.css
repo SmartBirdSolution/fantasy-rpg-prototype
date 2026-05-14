@@ -538,7 +538,7 @@ body {
 /* ── STATS PANEL HEADER ──────────────────────────── */
 #stats-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: 6px;
   border-bottom: 1px solid #1a2a4a;
@@ -546,22 +546,6 @@ body {
 }
 
 .cp-text { color: #f0a040 !important; }
-
-#btn-inventory {
-  padding: 3px 8px;
-  background: #0d1424;
-  border: 1px solid #2a3a5a;
-  border-radius: 3px;
-  color: #8bc;
-  font-family: inherit;
-  font-size: 8px;
-  letter-spacing: 1px;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: border-color 0.15s;
-}
-
-#btn-inventory:hover { border-color: #5a8aaa; color: #adf; }
 
 /* ── INVENTORY POPUP ─────────────────────────────── */
 #inventory-popup {
@@ -1168,3 +1152,110 @@ body {
   color: #4da;
 }
 #btn-qty-confirm:hover { border-color: #4af; color: #4ff; background: rgba(40,120,80,0.2); }
+
+/* ── PLAYER ACTION BAR ───────────────────────────────── */
+#action-bar {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(5, 8, 20, 0.90);
+  border: 1px solid #2a3a5a;
+  border-radius: 8px;
+  box-shadow: 0 2px 18px rgba(0,0,0,0.7);
+  z-index: 50;
+  pointer-events: auto;
+}
+
+#action-bar button {
+  padding: 7px 18px;
+  background: #0d1424;
+  border: 1px solid #2a3a5a;
+  border-radius: 5px;
+  color: #8bc;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+#action-bar button:hover {
+  border-color: #5a8aaa;
+  color: #adf;
+  background: #111e30;
+}
+
+#btn-admin-toggle {
+  border-color: #5a3a1a !important;
+  color: #c87040 !important;
+}
+
+#btn-admin-toggle:hover {
+  border-color: #a06030 !important;
+  color: #e8a060 !important;
+  background: #1a100a !important;
+}
+
+#btn-admin-toggle.active {
+  border-color: #c07030 !important;
+  color: #f0b060 !important;
+  background: #1a0e06 !important;
+  box-shadow: 0 0 10px rgba(200,120,60,0.35);
+}
+
+/* ── ADMIN PANEL ─────────────────────────────────────── */
+#admin-panel {
+  position: fixed;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 6, 2, 0.97);
+  border: 1px solid #7a4a1a;
+  border-radius: 8px;
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 190px;
+  z-index: 51;
+  pointer-events: auto;
+  box-shadow: 0 0 22px rgba(180,100,30,0.3);
+}
+
+#admin-panel-label {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #a06030;
+  text-align: center;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #3a2010;
+  white-space: nowrap;
+}
+
+#admin-panel button {
+  padding: 7px 12px;
+  background: #120a04;
+  border: 1px solid #4a2a0a;
+  border-radius: 5px;
+  color: #c87040;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+#admin-panel button:hover {
+  border-color: #c07030;
+  color: #f0b060;
+  background: #1e0e04;
+}

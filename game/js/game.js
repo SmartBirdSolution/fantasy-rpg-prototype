@@ -71,7 +71,7 @@ class Game {
       btnDuel.addEventListener('click', () => this._enterDuelQueue());
     }
 
-    document.getElementById('btn-inventory').addEventListener('click', () => {
+    UI.initActionBar(this.player, () => {
       if (this.scene === 'world') UI.openInventory(this.player);
     });
 

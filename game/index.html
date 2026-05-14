@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fantasy RPG</title>
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
@@ -33,7 +33,6 @@
       <div id="stats-panel">
         <div id="stats-header">
           <div class="stat-name" id="stat-charname">Hero</div>
-          <button id="btn-inventory">BAG</button>
         </div>
         <div class="stat-row"><span>HP</span><span id="stat-hp">100/100</span></div>
         <div class="stat-row"><span>LVL</span><span id="stat-level">1</span></div>
@@ -211,6 +210,21 @@
 
     <!-- FADE OVERLAY -->
     <div id="fade-overlay"></div>
+
+  </div>
+
+  <!-- PLAYER ACTION BAR (world scene) -->
+  <div id="action-bar" style="display:none">
+    <button id="btn-bag">BAG</button>
+    <button id="btn-admin-toggle">ADMIN</button>
+  </div>
+
+  <!-- ADMIN PANEL (testing only) -->
+  <div id="admin-panel" style="display:none">
+    <div id="admin-panel-label">ADMIN — TESTING ONLY</div>
+    <button id="btn-admin-hp">+50 HP</button>
+    <button id="btn-admin-bottle">Add Health Bottle</button>
+    <button id="btn-admin-gold">Add 100 Gold</button>
   </div>
 
   <div id="effects-panel">
@@ -218,12 +232,12 @@
     <div id="effects-list"></div>
   </div>
 
-  <script src="js/data.js?v=11"></script>
-  <script src="js/character.js?v=11"></script>
-  <script src="js/world.js?v=11"></script>
-  <script src="js/battle.js?v=11"></script>
-  <script src="js/ui.js?v=11"></script>
-  <script src="js/network.js?v=11"></script>
-  <script src="js/game.js?v=11"></script>
+  <script src="js/data.js?v=12"></script>
+  <script src="js/character.js?v=12"></script>
+  <script src="js/world.js?v=12"></script>
+  <script src="js/battle.js?v=12"></script>
+  <script src="js/ui.js?v=12"></script>
+  <script src="js/network.js?v=12"></script>
+  <script src="js/game.js?v=12"></script>
 </body>
 </html>
