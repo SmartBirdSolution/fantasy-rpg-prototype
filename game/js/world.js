@@ -17,9 +17,10 @@ class WorldScene {
     this.onBattleStart = null; // callback(enemy, enemyIdx)
     this._battleCooldown = 0;
 
-    this.onCityPrompt = null;   // callback() — show "Enter Dion?" popup
+    this.onCityPrompt        = null; // callback(screenX, screenY)
+    this.onCityPromptDismiss = null; // callback() — player walked away
     this._cityCooldown    = 0;
-    this._cityPromptShown = false; // prevent re-triggering while prompt is open
+    this._cityPromptShown = false;
 
     this._keyDown = e => { this.keys[e.code] = true; };
     this._keyUp   = e => { this.keys[e.code] = false; };
@@ -174,17 +175,23 @@ class WorldScene {
       }
     }
 
-    // City entry: only prompt when player is within 2 tiles of the gate center
-    const CITY_CX = 30 * TILE_SIZE + TILE_SIZE / 2; // world pixel center of city
-    const CITY_CY = 30 * TILE_SIZE + TILE_SIZE / 2;
-    const CITY_RADIUS = TILE_SIZE * 2; // ~2 tiles — must be right at the gate
-    if (Math.hypot(this.px - CITY_CX, this.py - CITY_CY) < CITY_RADIUS && !this._cityPromptShown) {
+    // City proximity constants
+    const CITY_CX     = 30 * TILE_SIZE + TILE_SIZE / 2;
+    const CITY_CY     = 30 * TILE_SIZE + TILE_SIZE / 2;
+    const CITY_RADIUS = TILE_SIZE * 2;
+    const distToCity  = Math.hypot(this.px - CITY_CX, this.py - CITY_CY);
+
+    if (!this._cityPromptShown && distToCity < CITY_RADIUS) {
+      // Player walked into the gate — show prompt
       this._cityPromptShown = true;
       if (this.onCityPrompt) {
-        const screenX = CITY_CX - this.cam.x;
-        const screenY = CITY_CY - this.cam.y;
-        this.onCityPrompt(screenX, screenY);
+        this.onCityPrompt(CITY_CX - this.cam.x, CITY_CY - this.cam.y);
       }
+    } else if (this._cityPromptShown && distToCity >= CITY_RADIUS) {
+      // Player walked away without choosing — auto-dismiss
+      this._cityPromptShown = false;
+      this._cityCooldown = 1; // brief pause before re-triggering
+      if (this.onCityPromptDismiss) this.onCityPromptDismiss();
     }
   }
 

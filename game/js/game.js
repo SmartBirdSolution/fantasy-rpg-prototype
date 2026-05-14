@@ -60,6 +60,7 @@ class Game {
         () => { UI.hideCityPrompt(); this.worldScene.dismissCityPrompt(true); }
       );
     };
+    this.worldScene.onCityPromptDismiss = () => UI.hideCityPrompt();
     this.worldScene.onPeerClick   = (peerId, peerName, cx, cy) => {
       if (this.scene !== 'world') return;
       UI.showPlayerContextMenu(
