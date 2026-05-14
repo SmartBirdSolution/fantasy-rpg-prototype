@@ -182,8 +182,8 @@ class WorldScene {
       if (this.onCityPrompt) {
         // Pass the city's screen position so the menu appears near it
         const ts = TILE_SIZE;
-        const screenX = (30 * ts + ts / 2) - this.cam.x;
-        const screenY = (27 * ts) - this.cam.y;
+        const screenX = (30 * ts + ts / 2) - this.cam.x; // center of village
+        const screenY = (30 * ts + ts / 2) - this.cam.y; // center of village
         this.onCityPrompt(screenX, screenY);
       }
     }
