@@ -58,35 +58,18 @@ class Game {
 
       UI.showScene('battle');
       UI.initBattleHUD(this.player, enemy);
-      UI.setButtonsEnabled(false);
-      UI.setTurnIndicator(true);
+      UI.setDefenseEnabled(false);
+      UI.setDefenseActive(false);
 
-      // Wire buttons
-      const el = UI._els;
-      el.btnTop.onclick    = () => this._playerAction('top');
-      el.btnMid.onclick    = () => this._playerAction('mid');
-      el.btnBot.onclick    = () => this._playerAction('bot');
-      el.btnStance.onclick = () => this._playerAction('stance');
+      document.getElementById('btn-defense').onclick = () => {
+        if (this.battleScene) this.battleScene.toggleDefense();
+      };
 
       this.scene = 'battle';
-      this.battleScene.init();
-
-      if (this.battleScene.playerTurn) {
-        UI.setButtonsEnabled(true);
-        UI.setTurnIndicator(true);
-      } else {
-        UI.setTurnIndicator(false);
-      }
+      this.battleScene.init(); // handles zone activation + turn indicator internally
 
       UI.fadeIn(null);
     });
-  }
-
-  _playerAction(zone) {
-    if (this.scene !== 'battle' || !this.battleScene) return;
-    UI.setButtonsEnabled(false);
-    UI.setTurnIndicator(false);
-    this.battleScene.playerAction(zone);
   }
 
   // ── BATTLE → WORLD ────────────────────────────────────────────────

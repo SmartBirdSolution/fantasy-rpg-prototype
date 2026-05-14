@@ -1,5 +1,19 @@
 'use strict';
 
+function _roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y,     x + w, y + r,     r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x,     y + h, x,     y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x,     y,     x + r, y,         r);
+  ctx.closePath();
+}
+
 class BattleScene {
   constructor(canvas, player, enemy) {
     this.canvas = canvas;
@@ -7,59 +21,133 @@ class BattleScene {
     this.player = player;
     this.enemy  = enemy;
 
-    // Fresh HP for enemy each battle
     this.enemy.currentHP = this.enemy.maxHP;
 
-    this.playerTurn  = true;
-    this.animState   = 'idle'; // 'idle' | 'playerAtk' | 'enemyAtk' | 'done'
-    this.animT       = 0;      // 0→1
-    this._onAnimDone = null;
+    this.playerTurn      = true;
+    this.playerDefending = false;
+    this.animState       = 'idle';
+    this.animT           = 0;
+    this._onAnimDone     = null;
+    this._animTime       = 0;
 
-    this.floats  = []; // floating damage numbers
+    this.zonesActive  = false;
+    this.hoveredZone  = null;
+
+    this.floats  = [];
     this.log     = [];
 
-    this.onBattleEnd = null; // callback('win'|'lose')
+    this.onBattleEnd = null;
     this._ended      = false;
+
+    this._clickHandler = e => this._handleClick(e);
+    this._moveHandler  = e => this._handleMove(e);
   }
 
   init() {
-    // Determine who goes first (higher speed goes first; tie → random)
     const pSpd = this.player.totalSpd;
     const eSpd = this.enemy.level + 5;
-    if (pSpd > eSpd)       this.playerTurn = true;
-    else if (eSpd > pSpd)  this.playerTurn = false;
-    else                   this.playerTurn = Math.random() < 0.5;
+    if (pSpd > eSpd)      this.playerTurn = true;
+    else if (eSpd > pSpd) this.playerTurn = false;
+    else                  this.playerTurn = Math.random() < 0.5;
 
     this._log(`⚔ Battle start vs ${this.enemy.type} (Lv${this.enemy.level})!`, 'log-system');
     this._log(this.playerTurn ? 'You move first!' : `${this.enemy.type} moves first!`, 'log-system');
 
-    if (!this.playerTurn) {
+    this.canvas.addEventListener('click',     this._clickHandler);
+    this.canvas.addEventListener('mousemove', this._moveHandler);
+
+    if (this.playerTurn) {
+      this.zonesActive = true;
+      UI.setDefenseEnabled(true);
+      UI.setTurnIndicator(true);
+    } else {
+      UI.setTurnIndicator(false);
       setTimeout(() => this._doEnemyTurn(), 1000);
     }
   }
 
-  // Called by UI buttons
-  playerAction(zone) { // zone: 'top' | 'mid' | 'bot' | 'stance'
-    if (!this.playerTurn || this.animState !== 'idle' || this._ended) return;
+  destroy() {
+    this.canvas.removeEventListener('click',     this._clickHandler);
+    this.canvas.removeEventListener('mousemove', this._moveHandler);
+    this.canvas.style.cursor = 'default';
+  }
+
+  // ── INPUT ──────────────────────────────────────────────────────────
+  _mouseCoords(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      mx: (e.clientX - rect.left) * (this.canvas.width  / rect.width),
+      my: (e.clientY - rect.top)  * (this.canvas.height / rect.height),
+    };
+  }
+
+  _zoneRects() {
+    const W = this.canvas.width, H = this.canvas.height;
+    const charH   = 68 * 2;
+    const groundY = H * 0.68;
+    const topY    = groundY - charH;
+    const h3      = charH / 3;
+    const panelW  = 88;
+    const panelX  = W * 0.75 - 44 - panelW - 8;
+
+    return {
+      top: { x: panelX, y: topY,          w: panelW, h: h3,   label: '▲ HEAD', color: '#501888', zone: 'top' },
+      mid: { x: panelX, y: topY + h3,     w: panelW, h: h3,   label: '● BODY', color: '#0e5828', zone: 'mid' },
+      bot: { x: panelX, y: topY + h3 * 2, w: panelW, h: h3,   label: '▼ LEGS', color: '#7a3a08', zone: 'bot' },
+    };
+  }
+
+  _hitZone(mx, my) {
+    if (!this.zonesActive) return null;
+    for (const r of Object.values(this._zoneRects())) {
+      if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) return r.zone;
+    }
+    return null;
+  }
+
+  _handleClick(e) {
+    if (!this.zonesActive || this._ended || this.animState !== 'idle') return;
+    const { mx, my } = this._mouseCoords(e);
+    const zone = this._hitZone(mx, my);
+    if (!zone) return;
+    this.zonesActive = false;
+    this.hoveredZone = null;
+    this.canvas.style.cursor = 'default';
+    UI.setDefenseEnabled(false);
+    UI.setTurnIndicator(false);
+    this._executePlayerAction(zone);
+  }
+
+  _handleMove(e) {
+    const { mx, my } = this._mouseCoords(e);
+    this.hoveredZone = this._hitZone(mx, my);
+    this.canvas.style.cursor = (this.zonesActive && this.hoveredZone) ? 'pointer' : 'default';
+  }
+
+  toggleDefense() {
+    if (!this.zonesActive || this._ended) return;
+    this.playerDefending = !this.playerDefending;
+    UI.setDefenseActive(this.playerDefending);
+  }
+
+  // ── COMBAT ─────────────────────────────────────────────────────────
+  _executePlayerAction(zone) {
+    if (this._ended || this.animState !== 'idle') return;
 
     const enemyDecision = this.enemy.chooseAction();
-    let playerDmg = 0, enemyDmg = 0;
+    let playerDmg = this._calcDmg(this.player, this.enemy, zone, enemyDecision.blockZone);
+    let enemyDmg  = this._calcDmg(this.enemy,  this.player, enemyDecision.action, null);
 
-    if (zone === 'stance') {
-      // Defensive stance: player deals 50%, takes 50%
-      const rawPlayer = this._calcDmg(this.player, this.enemy, 'mid', null);
-      const rawEnemy  = this._calcDmg(this.enemy, this.player, enemyDecision.action, null);
-      playerDmg = Math.round(rawPlayer * 0.5);
-      enemyDmg  = Math.round(rawEnemy  * 0.5);
-      this._log(`You take a defensive stance (dmg ×0.5 both ways).`);
-    } else {
-      playerDmg = this._calcDmg(this.player, this.enemy, zone, enemyDecision.blockZone);
-      enemyDmg  = this._calcDmg(this.enemy, this.player, enemyDecision.action, null);
-
-      const blocked = (enemyDecision.blockZone === zone);
-      this._log(`You attack ${zone}${blocked ? ' — BLOCKED! (×0.2 dmg)' : ''} → ${playerDmg} dmg.`);
-      this._log(`${this.enemy.type} attacks ${enemyDecision.action} → ${enemyDmg} dmg.`);
+    const defending = this.playerDefending;
+    if (defending) {
+      playerDmg = Math.round(playerDmg * 0.5);
+      enemyDmg  = Math.round(enemyDmg  * 0.5);
     }
+
+    const blocked = (enemyDecision.blockZone === zone);
+    const defTag  = defending ? ' [SHIELD ×0.5]' : '';
+    this._log(`You attack ${zone.toUpperCase()}${blocked ? ' — BLOCKED! (×0.2)' : ''} → ${playerDmg} dmg.${defTag}`);
+    this._log(`${this.enemy.type} attacks ${enemyDecision.action.toUpperCase()} → ${enemyDmg} dmg.${defTag}`);
 
     this._resolveRound(playerDmg, enemyDmg);
   }
@@ -68,18 +156,24 @@ class BattleScene {
     if (this._ended || this.animState !== 'idle') return;
 
     const enemyDecision = this.enemy.chooseAction();
-    const enemyDmg = this._calcDmg(this.enemy, this.player, enemyDecision.action, null);
+    let enemyDmg = this._calcDmg(this.enemy, this.player, enemyDecision.action, null);
 
-    this._log(`${this.enemy.type} attacks ${enemyDecision.action} → ${enemyDmg} dmg.`);
-    this._resolveRound(0, enemyDmg, true /* enemyOnly */);
+    if (this.playerDefending) {
+      enemyDmg = Math.round(enemyDmg * 0.5);
+      this._log(`${this.enemy.type} attacks ${enemyDecision.action.toUpperCase()} → ${enemyDmg} dmg. [SHIELD ×0.5]`);
+    } else {
+      this._log(`${this.enemy.type} attacks ${enemyDecision.action.toUpperCase()} → ${enemyDmg} dmg.`);
+    }
+
+    this._resolveRound(0, enemyDmg, true);
   }
 
   _calcDmg(attacker, defender, attackZone, defenderBlock) {
-    const atk = attacker.totalAtk ?? attacker.baseAtk;
-    const def = defender.totalDef ?? defender.baseDef;
-    let base = Math.max(1, atk - def * 0.5);
-    base *= 0.85 + Math.random() * 0.3; // ±15% variance
-    if (defenderBlock && defenderBlock === attackZone) base *= 0.2; // 80% block
+    const atk  = attacker.totalAtk ?? attacker.baseAtk;
+    const def  = defender.totalDef ?? defender.baseDef;
+    let base   = Math.max(1, atk - def * 0.5);
+    base      *= 0.85 + Math.random() * 0.3;
+    if (defenderBlock && defenderBlock === attackZone) base *= 0.2;
     return Math.max(1, Math.round(base));
   }
 
@@ -93,22 +187,17 @@ class BattleScene {
           this.player.takeDamage(enemyDmg);
           this._spawnFloat(enemyDmg, 'player');
         }
-        if (!this.player.isAlive()) {
-          this._endBattle('lose');
-          return;
-        }
-        this.animState  = 'idle';
-        this.playerTurn = true;
-        UI.setButtonsEnabled(true);
+        if (!this.player.isAlive()) { this._endBattle('lose'); return; }
+
+        this.animState   = 'idle';
+        this.playerTurn  = true;
+        this.zonesActive = true;
+        UI.setDefenseEnabled(true);
         UI.setTurnIndicator(true);
       };
     };
 
-    if (enemyOnly) {
-      // Skip player animation phase entirely
-      doEnemyPhase();
-      return;
-    }
+    if (enemyOnly) { doEnemyPhase(); return; }
 
     this.animState = 'playerAtk';
     this.animT     = 0;
@@ -118,23 +207,24 @@ class BattleScene {
         this.enemy.takeDamage(playerDmg);
         this._spawnFloat(playerDmg, 'enemy');
       }
-      if (!this.enemy.isAlive()) {
-        this._endBattle('win');
-        return;
-      }
+      if (!this.enemy.isAlive()) { this._endBattle('win'); return; }
+      UI.setTurnIndicator(false);
       doEnemyPhase();
     };
   }
 
   _endBattle(result) {
     if (this._ended) return;
-    this._ended = true;
-    this.animState = 'done';
-    UI.setButtonsEnabled(false);
+    this._ended      = true;
+    this.animState   = 'done';
+    this.zonesActive = false;
+    this.playerDefending = false;
+    UI.setDefenseEnabled(false);
+    UI.setDefenseActive(false);
 
     if (result === 'win') {
-      const xp   = this.enemy.xpReward;
-      const gold = this.enemy.goldReward;
+      const xp    = this.enemy.xpReward;
+      const gold  = this.enemy.goldReward;
       this.player.gold += gold;
       const leveled = this.player.gainXP(xp);
 
@@ -142,24 +232,18 @@ class BattleScene {
       if (leveled) this._log(`LEVEL UP! Now Lv${this.player.level}!`, 'log-win');
 
       const drop = this._rollLoot();
-      if (drop) {
-        this.player.equip(drop);
-        this._log(`Found: ${drop.name}!`, 'log-loot');
-      }
-
+      if (drop) { this.player.equip(drop); this._log(`Found: ${drop.name}!`, 'log-loot'); }
       if (leveled) UI.showLevelUp(this.player.level);
     } else {
-      this._log(`You were defeated...`, 'log-lose');
+      this._log('You were defeated...', 'log-lose');
     }
 
-    setTimeout(() => { if (this.onBattleEnd) this.onBattleEnd(result); }, 2200);
+    setTimeout(() => { this.destroy(); if (this.onBattleEnd) this.onBattleEnd(result); }, 2200);
   }
 
   _rollLoot() {
     for (const [key, tmpl] of Object.entries(EQUIPMENT_TEMPLATES)) {
-      if (Math.random() < tmpl.dropChance * 0.4) {
-        return { ...tmpl, id: key };
-      }
+      if (Math.random() < tmpl.dropChance * 0.4) return { ...tmpl, id: key };
     }
     return null;
   }
@@ -179,9 +263,10 @@ class BattleScene {
 
   // ── UPDATE ─────────────────────────────────────────────────────────
   update(dt) {
-    // Advance animation
+    this._animTime += dt;
+
     if (this.animState === 'playerAtk' || this.animState === 'enemyAtk') {
-      this.animT += dt * 2.8; // 0→1 in ~360ms
+      this.animT += dt * 2.8;
       if (this.animT >= 1) {
         this.animT = 1;
         const cb = this._onAnimDone;
@@ -190,7 +275,6 @@ class BattleScene {
       }
     }
 
-    // Float decay
     this.floats = this.floats.filter(f => {
       f.life -= dt;
       f.y    -= dt * 50;
@@ -198,7 +282,7 @@ class BattleScene {
     });
   }
 
-  // ── DRAW ──────────────────────────────────────────────────────────
+  // ── DRAW ───────────────────────────────────────────────────────────
   draw() {
     const ctx = this.ctx;
     const W = this.canvas.width, H = this.canvas.height;
@@ -210,14 +294,12 @@ class BattleScene {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Ground gradient
     const groundGrad = ctx.createLinearGradient(0, H * 0.68, 0, H);
     groundGrad.addColorStop(0, '#1e120a');
     groundGrad.addColorStop(1, '#0e0808');
     ctx.fillStyle = groundGrad;
     ctx.fillRect(0, H * 0.68, W, H * 0.32);
 
-    // Ground line
     ctx.strokeStyle = '#3a2010';
     ctx.lineWidth   = 2;
     ctx.beginPath();
@@ -225,36 +307,37 @@ class BattleScene {
     ctx.lineTo(W, H * 0.68);
     ctx.stroke();
 
-    // Ambient particles / stars
     ctx.fillStyle = 'rgba(180,160,255,0.15)';
     for (let i = 0; i < 30; i++) {
-      const sx = ((i * 137 + 50) % W);
-      const sy = ((i * 191 + 80) % (H * 0.65));
-      ctx.fillRect(sx, sy, 1, 1);
+      ctx.fillRect((i * 137 + 50) % W, (i * 191 + 80) % (H * 0.65), 1, 1);
     }
 
-    // ── Player (left, facing right) ──
-    const pLunge = this.animState === 'playerAtk'
-      ? Math.sin(this.animT * Math.PI) * 50 : 0;
+    // Player
+    const pLunge = this.animState === 'playerAtk' ? Math.sin(this.animT * Math.PI) * 50 : 0;
     ctx.save();
     ctx.translate(W * 0.25 + pLunge, H * 0.68);
     ctx.scale(2, 2);
     this.player.draw(ctx, 0, 0, true, 0);
     ctx.restore();
 
-    // ── Enemy (right, facing left via horizontal flip) ──
-    const eLunge = this.animState === 'enemyAtk'
-      ? -Math.sin(this.animT * Math.PI) * 50 : 0;
+    // Defense shield aura on player
+    if (this.playerDefending) {
+      this._drawDefenseShield(ctx, W * 0.25, H * 0.68);
+    }
+
+    // Enemy
+    const eLunge = this.animState === 'enemyAtk' ? -Math.sin(this.animT * Math.PI) * 50 : 0;
     ctx.save();
     ctx.translate(W * 0.75 + eLunge, H * 0.68);
-    ctx.scale(-2, 2); // negative x = face left
-    this.enemy.draw(ctx, 0, 0, true, 0); // draw "facing right" in flipped space
+    ctx.scale(-2, 2);
+    this.enemy.draw(ctx, 0, 0, true, 0);
     ctx.restore();
 
-    // Zone indicator lines on characters
     this._drawZoneLines(ctx, W, H);
 
-    // ── Floating damage numbers ──
+    if (this.zonesActive) this._drawZoneArrows(ctx, W, H);
+
+    // Floating damage numbers
     for (const f of this.floats) {
       ctx.globalAlpha = Math.max(0, f.life / f.maxLife);
       ctx.fillStyle   = '#ff4444';
@@ -266,7 +349,7 @@ class BattleScene {
   }
 
   _drawZoneLines(ctx, W, H) {
-    const charH = 68 * 2; // character height in screen px at scale 2
+    const charH = 68 * 2;
     const top   = H * 0.68 - charH;
     const bot   = H * 0.68;
     const h3    = (bot - top) / 3;
@@ -279,18 +362,92 @@ class BattleScene {
       ctx.beginPath(); ctx.moveTo(cx - 44, top + h3);   ctx.lineTo(cx + 44, top + h3);   ctx.stroke();
       ctx.beginPath(); ctx.moveTo(cx - 44, top + h3*2); ctx.lineTo(cx + 44, top + h3*2); ctx.stroke();
     }
-
     ctx.setLineDash([]);
 
-    // Zone labels (subtle)
     ctx.fillStyle = 'rgba(200,200,255,0.18)';
     ctx.font      = '9px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('HEAD',  W * 0.25, top + h3 * 0.5 + 3);
-    ctx.fillText('BODY',  W * 0.25, top + h3 * 1.5 + 3);
-    ctx.fillText('LEGS',  W * 0.25, top + h3 * 2.5 + 3);
-    ctx.fillText('HEAD',  W * 0.75, top + h3 * 0.5 + 3);
-    ctx.fillText('BODY',  W * 0.75, top + h3 * 1.5 + 3);
-    ctx.fillText('LEGS',  W * 0.75, top + h3 * 2.5 + 3);
+    ctx.fillText('HEAD', W * 0.25, top + h3 * 0.5 + 3);
+    ctx.fillText('BODY', W * 0.25, top + h3 * 1.5 + 3);
+    ctx.fillText('LEGS', W * 0.25, top + h3 * 2.5 + 3);
+    ctx.fillText('HEAD', W * 0.75, top + h3 * 0.5 + 3);
+    ctx.fillText('BODY', W * 0.75, top + h3 * 1.5 + 3);
+    ctx.fillText('LEGS', W * 0.75, top + h3 * 2.5 + 3);
+  }
+
+  _drawZoneArrows(ctx, W, H) {
+    const rects = Object.values(this._zoneRects());
+
+    for (const r of rects) {
+      const hover = this.hoveredZone === r.zone;
+      const alpha = hover ? 0.88 : 0.58;
+
+      // Panel background
+      const hexAlpha = Math.round(alpha * 255).toString(16).padStart(2, '0');
+      ctx.fillStyle = r.color + hexAlpha;
+      _roundRect(ctx, r.x, r.y + 2, r.w, r.h - 4, 6);
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = hover ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)';
+      ctx.lineWidth   = hover ? 2 : 1;
+      _roundRect(ctx, r.x, r.y + 2, r.w, r.h - 4, 6);
+      ctx.stroke();
+
+      const midY = r.y + r.h / 2;
+
+      // Label
+      ctx.fillStyle  = hover ? '#ffffff' : 'rgba(255,255,255,0.9)';
+      ctx.font       = `bold ${hover ? 12 : 11}px monospace`;
+      ctx.textAlign  = 'left';
+      ctx.fillText(r.label, r.x + 10, midY + 4);
+
+      // Right-pointing arrow
+      const ax   = r.x + r.w - 10;
+      const asz  = hover ? 8 : 6;
+      ctx.fillStyle = hover ? '#fff' : 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.moveTo(ax,       midY - asz * 0.6);
+      ctx.lineTo(ax,       midY + asz * 0.6);
+      ctx.lineTo(ax + asz, midY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Hint below panels
+    ctx.fillStyle = 'rgba(255,255,200,0.45)';
+    ctx.font      = '10px monospace';
+    ctx.textAlign = 'center';
+    const lastR   = rects[rects.length - 1];
+    ctx.fillText('CLICK TO ATTACK', lastR.x + lastR.w / 2, lastR.y + lastR.h + 14);
+  }
+
+  _drawDefenseShield(ctx, cx, cy) {
+    const pulse = 0.5 + 0.5 * Math.sin(this._animTime * 4);
+    const charCY = cy - 68;
+
+    // Soft aura
+    const r   = 48 + pulse * 8;
+    const grd = ctx.createRadialGradient(cx, charCY, 0, cx, charCY, r);
+    grd.addColorStop(0, `rgba(68,170,255,${0.18 + pulse * 0.14})`);
+    grd.addColorStop(1,  'rgba(68,170,255,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(cx, charCY, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Heater shield shape
+    const sx = cx - 11, sy = cy - 106, sw = 22, sh = 28;
+    ctx.fillStyle   = `rgba(68,170,255,${0.50 + pulse * 0.28})`;
+    ctx.strokeStyle = `rgba(180,225,255,${0.75 + pulse * 0.25})`;
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx + sw / 2, sy);
+    ctx.lineTo(sx + sw,     sy + sh * 0.42);
+    ctx.lineTo(sx + sw / 2, sy + sh);
+    ctx.lineTo(sx,          sy + sh * 0.42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   }
 }

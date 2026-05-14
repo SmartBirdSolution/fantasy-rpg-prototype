@@ -32,10 +32,8 @@ const UI = {
       turnIndicator: document.getElementById('turn-indicator'),
       battleLog:     document.getElementById('battle-log'),
 
-      btnTop:    document.getElementById('btn-top'),
-      btnMid:    document.getElementById('btn-mid'),
-      btnBot:    document.getElementById('btn-bot'),
-      btnStance: document.getElementById('btn-stance'),
+      btnDefense:    document.getElementById('btn-defense'),
+      defenseStatus: document.getElementById('defense-status'),
     };
   },
 
@@ -153,9 +151,13 @@ const UI = {
     el.style.color = isPlayer ? '#ffd700' : '#ff6060';
   },
 
-  setButtonsEnabled(on) {
-    [this._els.btnTop, this._els.btnMid, this._els.btnBot, this._els.btnStance]
-      .forEach(b => { b.disabled = !on; });
+  setDefenseEnabled(on) {
+    this._els.btnDefense.disabled = !on;
+  },
+
+  setDefenseActive(on) {
+    this._els.btnDefense.classList.toggle('active', on);
+    this._els.defenseStatus.textContent = on ? 'ON' : 'OFF';
   },
 
   appendBattleLog(msg, cls = '') {

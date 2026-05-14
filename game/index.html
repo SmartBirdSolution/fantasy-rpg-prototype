@@ -57,17 +57,14 @@
       </div>
       <div id="turn-indicator">YOUR TURN</div>
 
-      <!-- Zone diagram -->
-      <div id="zone-legend">
-        <span>↑ Top</span><span>● Mid</span><span>↓ Bot</span>
-      </div>
-
-      <!-- Action buttons -->
-      <div id="action-buttons">
-        <button id="btn-top" class="action-btn zone-top">▲ Top Attack</button>
-        <button id="btn-mid" class="action-btn zone-mid">● Mid Attack</button>
-        <button id="btn-bot" class="action-btn zone-bot">▼ Bot Attack</button>
-        <button id="btn-stance" class="action-btn stance-btn">🛡 Defend</button>
+      <!-- Defense toggle (left side, player-side) -->
+      <div id="defense-panel">
+        <button id="btn-defense" disabled>
+          <span class="def-icon">🛡</span>
+          <span class="def-label">DEFEND</span>
+          <span id="defense-status">OFF</span>
+        </button>
+        <div id="defense-hint">Click to toggle<br>before attacking</div>
       </div>
 
       <!-- Battle log -->
