@@ -9,6 +9,8 @@ const Network = {
   lockedEnemies:  new Map(),  // enemyIdx → playerId
   defeatedEnemies: new Set(), // enemy indices permanently defeated this session
 
+  cityPopulation: 0,          // live count of players inside any city (updated for all players)
+
   // Set by game layer to react to server events
   onReady:          null, // ()
   onPlayersChanged: null, // ()
@@ -133,6 +135,7 @@ const Network = {
         break;
 
       case 'city_population':
+        this.cityPopulation = msg.count;
         if (this.onCityPopulation) this.onCityPopulation(msg.count);
         break;
     }

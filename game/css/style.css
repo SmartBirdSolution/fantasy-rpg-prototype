@@ -1209,6 +1209,71 @@ body {
   box-shadow: 0 0 16px rgba(200,160,40,0.45);
 }
 
+/* ── CITY ENTRY PROMPT ───────────────────────────────── */
+#city-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  z-index: 60;
+}
+
+#city-prompt-box {
+  background: rgba(5, 8, 20, 0.97);
+  border: 2px solid #8a6a20;
+  border-radius: 10px;
+  padding: 22px 36px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-width: 240px;
+  box-shadow: 0 0 40px rgba(200,160,40,0.3);
+}
+
+#city-prompt-title {
+  font-size: 1.4rem;
+  letter-spacing: 8px;
+  color: #f0c040;
+  text-shadow: 0 0 14px rgba(240,192,64,0.6);
+}
+
+#city-prompt-msg {
+  font-size: 10px;
+  color: #a08850;
+  letter-spacing: 2px;
+}
+
+#city-prompt-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+#city-prompt-buttons button {
+  padding: 9px 24px;
+  background: rgba(30, 20, 4, 0.85);
+  border: 1px solid #6a4a10;
+  border-radius: 5px;
+  color: #c8a040;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+#city-prompt-buttons button:hover {
+  border-color: #d0a030;
+  background: rgba(60, 40, 8, 0.9);
+}
+
+#btn-city-yes {
+  border-color: #8a6a20 !important;
+  color: #f0c040 !important;
+}
+
 /* ── PLAYER ACTION BAR ───────────────────────────────── */
 #action-bar {
   position: fixed;

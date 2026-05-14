@@ -271,9 +271,9 @@ wss.on('connection', ws => {
         state.scene = 'city';
         broadcast({ type: 'player_update', player: { id, name: state.name, race: state.race,
           cls: state.cls, x: state.x, y: state.y, scene: 'city', fightingEnemy: null } }, ws);
-        for (const [w, s] of wsToPlayer) {
-          if (cityPlayers.has(s.id)) sendTo(w, { type: 'city_population', count: cityPlayers.size });
-        }
+        // Broadcast to ALL players so world map label stays in sync
+        broadcast({ type: 'city_population', count: cityPlayers.size });
+        sendTo(ws, { type: 'city_population', count: cityPlayers.size });
         console.log(`  Player ${id} entered city  (city pop: ${cityPlayers.size})`);
         break;
       }
@@ -283,9 +283,8 @@ wss.on('connection', ws => {
         state.scene = 'world';
         broadcast({ type: 'player_update', player: { id, name: state.name, race: state.race,
           cls: state.cls, x: state.x, y: state.y, scene: 'world', fightingEnemy: null } }, ws);
-        for (const [w, s] of wsToPlayer) {
-          if (cityPlayers.has(s.id)) sendTo(w, { type: 'city_population', count: cityPlayers.size });
-        }
+        // Broadcast to ALL players so world map label stays in sync
+        broadcast({ type: 'city_population', count: cityPlayers.size });
         console.log(`  Player ${id} left city  (city pop: ${cityPlayers.size})`);
         break;
       }
@@ -400,11 +399,11 @@ wss.on('connection', ws => {
         break;
       }
     }
-    // Remove from city if they were inside
+    // Remove from city if they were inside — broadcast updated count to ALL remaining players
     if (cityPlayers.has(id)) {
       cityPlayers.delete(id);
-      for (const [w, s] of wsToPlayer) {
-        if (w !== ws && cityPlayers.has(s.id)) sendTo(w, { type: 'city_population', count: cityPlayers.size });
+      for (const [w] of wsToPlayer) {
+        if (w !== ws) sendTo(w, { type: 'city_population', count: cityPlayers.size });
       }
     }
     // Cancel any pending trade requests from this player

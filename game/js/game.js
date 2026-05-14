@@ -51,8 +51,14 @@ class Game {
 
     this.worldScene = new WorldScene(this.canvas, this.player);
     this.worldScene.init();
+    this.worldScene.startCityCooldown(); // grace period so prompt doesn't fire on spawn
     this.worldScene.onBattleStart = (e, idx) => this._startBattle(e, idx);
-    this.worldScene.onCityEnter   = () => this._enterCity();
+    this.worldScene.onCityPrompt  = () => {
+      UI.showCityPrompt(
+        () => { UI.hideCityPrompt(); this._enterCity(); },
+        () => { UI.hideCityPrompt(); this.worldScene.dismissCityPrompt(true); }
+      );
+    };
     this.worldScene.onPeerClick   = (peerId, peerName, cx, cy) => {
       if (this.scene !== 'world') return;
       UI.showPlayerContextMenu(
@@ -127,10 +133,9 @@ class Game {
   _enterCity() {
     if (this.scene !== 'world') return;
     this.scene = 'transitioning';
-    Network.sendCityEnter();
     UI.fadeOut(() => {
+      Network.sendCityEnter(); // send after fade so city_population arrives when UI is visible
       UI.showScene('city');
-      UI.showCityUI(1); // server will push the real count via city_population
       this.scene = 'city';
       UI.fadeIn(null);
     });

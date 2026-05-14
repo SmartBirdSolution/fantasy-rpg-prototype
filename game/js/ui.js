@@ -55,6 +55,9 @@ const UI = {
       cityUI:         document.getElementById('city-ui'),
       cityPopulation: document.getElementById('city-population'),
       btnLeaveCity:   document.getElementById('btn-leave-city'),
+      cityPrompt:     document.getElementById('city-prompt'),
+      btnCityYes:     document.getElementById('btn-city-yes'),
+      btnCityNo:      document.getElementById('btn-city-no'),
     };
     this._duelTimerHandle = null;
     this._duelStartTime   = 0;
@@ -86,6 +89,7 @@ const UI = {
     this._els.worldUI.style.display       = name === 'world'      ? '' : 'none';
     this._els.battleUI.style.display      = name === 'battle'     ? '' : 'none';
     this._els.cityUI.style.display        = name === 'city'       ? '' : 'none';
+    this._els.cityPrompt.style.display    = 'none'; // always close prompt on scene change
 
     // Action bar is only visible in the world scene
     if (name === 'world') {
@@ -704,8 +708,8 @@ const UI = {
   },
 
   // ── CITY UI ───────────────────────────────────────────────────────
-  showCityUI(population) {
-    this.updateCityPopulation(population);
+  showCityUI() {
+    // Population will be updated by server's city_population message
   },
 
   updateCityPopulation(count) {
@@ -714,6 +718,16 @@ const UI = {
 
   hideCityUI() {
     this._els.cityUI.style.display = 'none';
+  },
+
+  showCityPrompt(onYes, onNo) {
+    this._els.btnCityYes.onclick = onYes;
+    this._els.btnCityNo.onclick  = onNo;
+    this._els.cityPrompt.style.display = 'flex';
+  },
+
+  hideCityPrompt() {
+    this._els.cityPrompt.style.display = 'none';
   },
 
   // ── GAME OVER ─────────────────────────────────────────────────────

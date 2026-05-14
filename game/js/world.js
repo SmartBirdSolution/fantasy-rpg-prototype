@@ -17,8 +17,9 @@ class WorldScene {
     this.onBattleStart = null; // callback(enemy, enemyIdx)
     this._battleCooldown = 0;
 
-    this.onCityEnter = null; // callback()
-    this._cityCooldown = 0;
+    this.onCityPrompt = null;   // callback() — show "Enter Dion?" popup
+    this._cityCooldown    = 0;
+    this._cityPromptShown = false; // prevent re-triggering while prompt is open
 
     this._keyDown = e => { this.keys[e.code] = true; };
     this._keyUp   = e => { this.keys[e.code] = false; };
@@ -90,7 +91,13 @@ class WorldScene {
   }
 
   startCityCooldown() {
-    this._cityCooldown = 1.5;
+    this._cityCooldown    = 3;
+    this._cityPromptShown = false;
+  }
+
+  dismissCityPrompt(longCooldown) {
+    this._cityPromptShown = false;
+    this._cityCooldown = longCooldown ? 4 : 0;
   }
 
   update(dt) {
@@ -166,12 +173,13 @@ class WorldScene {
       }
     }
 
-    // City entry check — fires when the player steps onto a VILLAGE tile
+    // City entry: show prompt once when player steps on a VILLAGE tile
     const tx = Math.floor(this.px / TILE_SIZE);
     const ty = Math.floor(this.py / TILE_SIZE);
     if (ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W) {
-      if (MAP_DATA[ty][tx] === TILE.VILLAGE) {
-        if (this.onCityEnter) this.onCityEnter();
+      if (MAP_DATA[ty][tx] === TILE.VILLAGE && !this._cityPromptShown) {
+        this._cityPromptShown = true;
+        if (this.onCityPrompt) this.onCityPrompt();
       }
     }
   }
@@ -185,6 +193,7 @@ class WorldScene {
     ctx.translate(-Math.floor(this.cam.x), -Math.floor(this.cam.y));
 
     this._drawTiles();
+    this._drawCityLabel(ctx);
     this._drawEnemies();
     this._drawRemotePlayers();
     this._drawPlayer();
@@ -276,6 +285,26 @@ class WorldScene {
     ctx.fill();
     ctx.fillStyle = '#6aafff';
     ctx.fillRect(cx - 3, cy - 2, 6, 6);
+  }
+
+  _drawCityLabel(ctx) {
+    const ts = TILE_SIZE;
+    // Village center col 30, draw label above row 27 (topmost village row)
+    const cx = 30 * ts + ts / 2;
+    const cy = 27 * ts - 4;
+    const pop = Network.cityPopulation || 0;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.70)';
+    ctx.fillRect(cx - 34, cy - 24, 68, 28);
+
+    ctx.fillStyle = '#f0d070';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('DION', cx, cy - 10);
+
+    ctx.fillStyle = '#88ccaa';
+    ctx.font = '8px monospace';
+    ctx.fillText(pop + ' inside', cx, cy + 2);
   }
 
   _drawEnemies() {
