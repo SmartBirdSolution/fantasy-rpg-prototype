@@ -73,6 +73,7 @@ class WorldScene {
 
     for (const p of Network.remotePlayers.values()) {
       if (!p.race) continue;
+      if (p.scene === 'city') continue; // in city — no interaction on world map
       // p.x and p.y are world pixel coords (as sent by sendMove)
       const dist = Math.hypot(worldX - p.x, worldY - p.y);
       // Check proximity of LOCAL player to the remote peer
@@ -173,13 +174,17 @@ class WorldScene {
       }
     }
 
-    // City entry: show prompt once when player steps on a VILLAGE tile
+    // City entry: fire when player walks into the village bounding box (rows 27-33, cols 27-33)
     const tx = Math.floor(this.px / TILE_SIZE);
     const ty = Math.floor(this.py / TILE_SIZE);
-    if (ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W) {
-      if (MAP_DATA[ty][tx] === TILE.VILLAGE && !this._cityPromptShown) {
-        this._cityPromptShown = true;
-        if (this.onCityPrompt) this.onCityPrompt();
+    if (tx >= 27 && tx <= 33 && ty >= 27 && ty <= 33 && !this._cityPromptShown) {
+      this._cityPromptShown = true;
+      if (this.onCityPrompt) {
+        // Pass the city's screen position so the menu appears near it
+        const ts = TILE_SIZE;
+        const screenX = (30 * ts + ts / 2) - this.cam.x;
+        const screenY = (27 * ts) - this.cam.y;
+        this.onCityPrompt(screenX, screenY);
       }
     }
   }
@@ -225,7 +230,6 @@ class WorldScene {
         if (tileType === TILE.FOREST)   this._drawTree(ctx, px + ts/2, py + ts/2 - 2, tx, ty);
         if (tileType === TILE.MOUNTAIN) this._drawPeak(ctx, px + ts/2, py + ts);
         if (tileType === TILE.WATER)    this._drawWave(ctx, px, py, ts);
-        if (tileType === TILE.VILLAGE)  this._drawHouse(ctx, px + ts/2, py + ts/2, tx, ty);
       }
     }
   }
@@ -289,22 +293,59 @@ class WorldScene {
 
   _drawCityLabel(ctx) {
     const ts = TILE_SIZE;
-    // Village center col 30, draw label above row 27 (topmost village row)
-    const cx = 30 * ts + ts / 2;
-    const cy = 27 * ts - 4;
-    const pop = Network.cityPopulation || 0;
+    // Draw the city centered on the village block (col 30, rows 27-33)
+    const cx = 30 * ts + ts / 2;  // horizontal center
+    const cy = 30 * ts;            // vertical center of village
 
-    ctx.fillStyle = 'rgba(0,0,0,0.70)';
-    ctx.fillRect(cx - 34, cy - 24, 68, 28);
+    // ── City gate / building ──────────────────────────────
+    // Main wall
+    ctx.fillStyle = '#9a8060';
+    ctx.fillRect(cx - 36, cy - 14, 72, 28);
+    // Gate arch
+    ctx.fillStyle = '#3a2a10';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 14, 9, Math.PI, 0);
+    ctx.fillRect(cx - 9, cy + 5, 18, 9);
+    ctx.fill();
+    // Left tower
+    ctx.fillStyle = '#b09070';
+    ctx.fillRect(cx - 46, cy - 22, 18, 36);
+    ctx.fillStyle = '#786040';
+    ctx.fillRect(cx - 48, cy - 30, 22, 10);
+    // Right tower
+    ctx.fillStyle = '#b09070';
+    ctx.fillRect(cx + 28, cy - 22, 18, 36);
+    ctx.fillStyle = '#786040';
+    ctx.fillRect(cx + 26, cy - 30, 22, 10);
+    // Battlements left
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = '#786040';
+      ctx.fillRect(cx - 46 + i * 8, cy - 34, 5, 6);
+    }
+    // Battlements right
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = '#786040';
+      ctx.fillRect(cx + 28 + i * 8, cy - 34, 5, 6);
+    }
+
+    // ── DION nameplate — anchored above gate ──────────────
+    const pop = Network.cityPopulation || 0;
+    const labelY = cy - 42;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.80)';
+    ctx.fillRect(cx - 36, labelY - 18, 72, 30);
+    ctx.strokeStyle = '#8a6a20';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - 36, labelY - 18, 72, 30);
 
     ctx.fillStyle = '#f0d070';
-    ctx.font = 'bold 11px monospace';
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('DION', cx, cy - 10);
+    ctx.fillText('DION', cx, labelY - 4);
 
-    ctx.fillStyle = '#88ccaa';
-    ctx.font = '8px monospace';
-    ctx.fillText(pop + ' inside', cx, cy + 2);
+    ctx.fillStyle = '#88bb88';
+    ctx.font = '7px monospace';
+    ctx.fillText(pop + ' inside', cx, labelY + 8);
   }
 
   _drawEnemies() {

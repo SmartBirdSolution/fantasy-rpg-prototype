@@ -53,8 +53,9 @@ class Game {
     this.worldScene.init();
     this.worldScene.startCityCooldown(); // grace period so prompt doesn't fire on spawn
     this.worldScene.onBattleStart = (e, idx) => this._startBattle(e, idx);
-    this.worldScene.onCityPrompt  = () => {
+    this.worldScene.onCityPrompt  = (screenX, screenY) => {
       UI.showCityPrompt(
+        screenX, screenY,
         () => { UI.hideCityPrompt(); this._enterCity(); },
         () => { UI.hideCityPrompt(); this.worldScene.dismissCityPrompt(true); }
       );

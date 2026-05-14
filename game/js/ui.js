@@ -720,10 +720,14 @@ const UI = {
     this._els.cityUI.style.display = 'none';
   },
 
-  showCityPrompt(onYes, onNo) {
+  showCityPrompt(screenX, screenY, onYes, onNo) {
     this._els.btnCityYes.onclick = onYes;
     this._els.btnCityNo.onclick  = onNo;
-    this._els.cityPrompt.style.display = 'flex';
+    const el = this._els.cityPrompt;
+    el.style.display = 'block';
+    // Position just above the city visual on screen, clamped to viewport
+    el.style.left = Math.min(screenX - 60, window.innerWidth  - 140) + 'px';
+    el.style.top  = Math.max(screenY - 90, 8) + 'px';
   },
 
   hideCityPrompt() {

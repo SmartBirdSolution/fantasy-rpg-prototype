@@ -59,6 +59,7 @@ const Network = {
         for (const p of msg.players) this.remotePlayers.set(p.id, p);
         for (const [k, v] of Object.entries(msg.locks)) this.lockedEnemies.set(Number(k), v);
         for (const idx of msg.defeated) this.defeatedEnemies.add(idx);
+        if (msg.cityPopulation != null) this.cityPopulation = msg.cityPopulation;
         if (this.onReady) this.onReady();
         if (this.onPlayersChanged) this.onPlayersChanged();
         break;

@@ -1209,70 +1209,44 @@ body {
   box-shadow: 0 0 16px rgba(200,160,40,0.45);
 }
 
-/* ── CITY ENTRY PROMPT ───────────────────────────────── */
+/* ── CITY ENTRY PROMPT (small context menu) ──────────── */
 #city-prompt {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
+  background: rgba(5, 8, 20, 0.98);
+  border: 1px solid #2a3a5a;
+  border-radius: 4px;
+  min-width: 120px;
   z-index: 60;
+  pointer-events: auto;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.7);
 }
 
-#city-prompt-box {
-  background: rgba(5, 8, 20, 0.97);
-  border: 2px solid #8a6a20;
-  border-radius: 10px;
-  padding: 22px 36px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  min-width: 240px;
-  box-shadow: 0 0 40px rgba(200,160,40,0.3);
+#city-prompt-name {
+  font-size: 9px;
+  color: #f0d070;
+  letter-spacing: 3px;
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid #1a2a4a;
 }
 
-#city-prompt-title {
-  font-size: 1.4rem;
-  letter-spacing: 8px;
-  color: #f0c040;
-  text-shadow: 0 0 14px rgba(240,192,64,0.6);
-}
-
-#city-prompt-msg {
-  font-size: 10px;
-  color: #a08850;
-  letter-spacing: 2px;
-}
-
-#city-prompt-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-#city-prompt-buttons button {
-  padding: 9px 24px;
-  background: rgba(30, 20, 4, 0.85);
-  border: 1px solid #6a4a10;
-  border-radius: 5px;
-  color: #c8a040;
+#city-prompt button {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  background: transparent;
+  border: none;
+  color: #8bc4d8;
   font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
 }
 
-#city-prompt-buttons button:hover {
-  border-color: #d0a030;
-  background: rgba(60, 40, 8, 0.9);
-}
+#city-prompt button:hover { background: #1a2a4a; color: #fff; }
 
-#btn-city-yes {
-  border-color: #8a6a20 !important;
-  color: #f0c040 !important;
-}
+#btn-city-yes { color: #f0d070; }
+#btn-city-yes:hover { background: #2a1a00 !important; color: #f0d070 !important; }
 
 /* ── PLAYER ACTION BAR ───────────────────────────────── */
 #action-bar {

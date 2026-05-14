@@ -143,11 +143,12 @@ wss.on('connection', ws => {
 
   // Send new player their ID + current world snapshot
   sendTo(ws, {
-    type:     'welcome',
+    type:           'welcome',
     id,
-    players:  allOtherStates(id),
-    locks:    Object.fromEntries([...enemyLocks].map(([k, v]) => [k, v])),
-    defeated: [...defeated],
+    players:        allOtherStates(id),
+    locks:          Object.fromEntries([...enemyLocks].map(([k, v]) => [k, v])),
+    defeated:       [...defeated],
+    cityPopulation: cityPlayers.size,
   });
 
   // Tell everyone else a new player appeared
