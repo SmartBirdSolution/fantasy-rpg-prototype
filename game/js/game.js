@@ -147,11 +147,11 @@ class Game {
   _leaveCity() {
     Network.sendCityLeave();
     UI.fadeOut(() => {
-      // Place player at tile (34, 30) — just south of the village block
+      // Place player at tile (34, 30) — just outside the east gate on the road
       this.worldScene.px = 34 * TILE_SIZE + TILE_SIZE / 2;
-      this.worldScene.py = 34 * TILE_SIZE + TILE_SIZE / 2;
+      this.worldScene.py = 30 * TILE_SIZE + TILE_SIZE / 2;
       this.player.worldTileX = 34;
-      this.player.worldTileY = 34;
+      this.player.worldTileY = 30;
       this.worldScene._snapCamera();
       this.worldScene.startCityCooldown();
       UI.showScene('world');
