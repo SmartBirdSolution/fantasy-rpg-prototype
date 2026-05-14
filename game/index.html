@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fantasy RPG</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="ui-overlay">
+
+    <!-- CHARACTER SELECT -->
+    <div id="char-select-ui" class="scene-ui">
+      <h1>FANTASY RPG</h1>
+      <p class="subtitle">Choose your hero</p>
+      <div class="select-section">
+        <h2>Race</h2>
+        <div id="race-grid" class="select-grid"></div>
+      </div>
+      <div class="select-section">
+        <h2>Class</h2>
+        <div id="class-grid" class="select-grid"></div>
+      </div>
+      <div id="char-preview"></div>
+      <button id="confirm-char">BEGIN ADVENTURE</button>
+    </div>
+
+    <!-- WORLD UI -->
+    <div id="world-ui" class="scene-ui" style="display:none">
+      <div id="stats-panel">
+        <div class="stat-name" id="stat-charname">Hero</div>
+        <div class="stat-row"><span>HP</span><span id="stat-hp">100/100</span></div>
+        <div class="stat-row"><span>LVL</span><span id="stat-level">1</span></div>
+        <div class="stat-row"><span>XP</span></div>
+        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
+        <div class="stat-row"><span>Gold</span><span id="stat-gold">0</span></div>
+        <div class="stat-row equip-row"><span>Wpn</span><span id="stat-weapon">—</span></div>
+        <div class="stat-row equip-row"><span>Arm</span><span id="stat-armor">—</span></div>
+      </div>
+      <div id="world-hint">WASD / Arrow Keys to move</div>
+    </div>
+
+    <!-- BATTLE UI -->
+    <div id="battle-ui" class="scene-ui" style="display:none">
+      <!-- HUDs -->
+      <div id="player-hud">
+        <div class="hud-name" id="player-hud-name">Hero</div>
+        <div class="hp-bar-track"><div class="hp-bar-fill" id="player-hp-fill" style="width:100%"></div></div>
+        <div class="hp-text" id="player-hp-text">100/100</div>
+      </div>
+      <div id="enemy-hud">
+        <div class="hud-name" id="enemy-hud-name">Enemy</div>
+        <div class="hp-bar-track"><div class="hp-bar-fill" id="enemy-hp-fill" style="width:100%"></div></div>
+        <div class="hp-text" id="enemy-hp-text">30/30</div>
+      </div>
+      <div id="turn-indicator">YOUR TURN</div>
+
+      <!-- Zone diagram -->
+      <div id="zone-legend">
+        <span>↑ Top</span><span>● Mid</span><span>↓ Bot</span>
+      </div>
+
+      <!-- Action buttons -->
+      <div id="action-buttons">
+        <button id="btn-top" class="action-btn zone-top">▲ Top Attack</button>
+        <button id="btn-mid" class="action-btn zone-mid">● Mid Attack</button>
+        <button id="btn-bot" class="action-btn zone-bot">▼ Bot Attack</button>
+        <button id="btn-stance" class="action-btn stance-btn">🛡 Defend</button>
+      </div>
+
+      <!-- Battle log -->
+      <div id="battle-log"></div>
+    </div>
+
+    <!-- LEVEL UP OVERLAY -->
+    <div id="levelup-overlay" style="display:none">
+      <div id="levelup-box">
+        <div class="levelup-title">⬆ LEVEL UP!</div>
+        <div id="levelup-text"></div>
+      </div>
+    </div>
+
+    <!-- GAME OVER -->
+    <div id="gameover-overlay" style="display:none">
+      <div id="gameover-box">
+        <div class="gameover-title">DEFEATED</div>
+        <p>You were bested in combat...</p>
+        <button id="btn-respawn">Respawn at Village</button>
+      </div>
+    </div>
+
+    <!-- FADE OVERLAY -->
+    <div id="fade-overlay"></div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/character.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
