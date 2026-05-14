@@ -55,10 +55,10 @@ function _buildMap() {
 
   // ── Mountain zone (top-right) ──
   fill(2, 36, 26, 57, M);
-  // Sparse forest patches in mountain zone
-  fill(4, 38, 8, 42, F);
-  fill(10, 44, 14, 48, F);
-  fill(6, 50, 10, 54, F);
+  // Grass paths and clearings through the mountains (reachable from south)
+  fill(20, 36, 26, 42, G);   // entrance corridor from south
+  fill(10, 40, 22, 51, G);   // large mid clearing
+  fill(2,  49, 12, 57, G);   // deep north clearing for hard enemies
 
   // ── Sand zone (bottom) ──
   fill(38, 4, 57, 54, S);
@@ -115,12 +115,12 @@ const RACE_DATA = {
 
 // ── CLASS DATA ──────────────────────────────────────────────────────
 const CLASS_DATA = {
-  Knight:       { baseHP: 120, baseAtk: 12, baseDef: 10, baseSpd:  7, desc: 'Balanced tank' },
-  BladeWarrior: { baseHP: 100, baseAtk: 16, baseDef:  7, baseSpd:  9, desc: 'High damage dealer' },
-  Ranger:       { baseHP:  90, baseAtk: 14, baseDef:  6, baseSpd: 12, desc: 'Swift striker' },
-  Mystic:       { baseHP:  80, baseAtk: 18, baseDef:  5, baseSpd:  8, desc: 'Glass cannon' },
-  Assassin:     { baseHP:  85, baseAtk: 15, baseDef:  5, baseSpd: 14, desc: 'Fastest attacker' },
-  Cleric:       { baseHP: 110, baseAtk: 10, baseDef:  8, baseSpd:  6, desc: 'Resilient fighter' },
+  Knight:       { baseHP: 120, baseAtk: 12, baseDef: 10, baseSpd:  7, baseRegen: 1.0, desc: 'Balanced tank' },
+  BladeWarrior: { baseHP: 100, baseAtk: 16, baseDef:  7, baseSpd:  9, baseRegen: 1.5, desc: 'High damage dealer' },
+  Ranger:       { baseHP:  90, baseAtk: 14, baseDef:  6, baseSpd: 12, baseRegen: 2.0, desc: 'Swift striker' },
+  Mystic:       { baseHP:  80, baseAtk: 18, baseDef:  5, baseSpd:  8, baseRegen: 1.0, desc: 'Glass cannon' },
+  Assassin:     { baseHP:  85, baseAtk: 15, baseDef:  5, baseSpd: 14, baseRegen: 2.5, desc: 'Fastest attacker' },
+  Cleric:       { baseHP: 110, baseAtk: 10, baseDef:  8, baseSpd:  6, baseRegen: 3.0, desc: 'Resilient fighter' },
 };
 
 // ── ENEMY TYPES ─────────────────────────────────────────────────────
@@ -135,16 +135,16 @@ const ENEMY_TYPES = {
 
 // ── ENEMY SPAWN LIST ────────────────────────────────────────────────
 const ENEMY_SPAWNS = [
-  // Easy zone — forest (top-left)
-  { type: 'Goblin',   tx:  8, ty:  8  },
-  { type: 'Goblin',   tx: 12, ty:  5  },
-  { type: 'Goblin',   tx:  5, ty: 15  },
-  { type: 'Goblin',   tx: 18, ty: 10  },
-  { type: 'Goblin',   tx: 10, ty: 20  },
-  { type: 'Wolf',     tx: 15, ty:  7  },
-  { type: 'Wolf',     tx:  6, ty: 21  },
-  { type: 'Wolf',     tx: 20, ty: 18  },
-  { type: 'Wolf',     tx: 13, ty: 13  },
+  // Easy zone — forest clearings (top-left)
+  { type: 'Goblin',   tx:  8, ty:  8  },  // clearing (7-9, 7-9)
+  { type: 'Goblin',   tx: 15, ty:  5  },  // clearing (4-6, 14-18)
+  { type: 'Goblin',   tx:  5, ty: 15  },  // clearing (14-16, 5-8)
+  { type: 'Goblin',   tx: 18, ty: 10  },  // clearing (10-12, 18-22)
+  { type: 'Goblin',   tx: 13, ty: 21  },  // clearing (20-22, 12-15)
+  { type: 'Wolf',     tx: 17, ty:  5  },  // clearing (4-6, 14-18)
+  { type: 'Wolf',     tx: 12, ty: 22  },  // clearing (20-22, 12-15)
+  { type: 'Wolf',     tx: 19, ty: 11  },  // clearing (10-12, 18-22)
+  { type: 'Wolf',     tx: 21, ty: 10  },  // clearing (10-12, 18-22)
   // Mid zone — sand (bottom)
   { type: 'Bandit',   tx: 15, ty: 42  },
   { type: 'Bandit',   tx: 25, ty: 46  },
@@ -154,22 +154,17 @@ const ENEMY_SPAWNS = [
   { type: 'Skeleton', tx: 38, ty: 50  },
   { type: 'Skeleton', tx: 12, ty: 50  },
   { type: 'Skeleton', tx: 43, ty: 44  },
-  // Hard zone — mountains (top-right)
-  { type: 'Troll',    tx: 42, ty:  8  },
-  { type: 'Troll',    tx: 50, ty: 14  },
-  { type: 'Troll',    tx: 46, ty: 20  },
-  { type: 'Dragon',   tx: 54, ty:  6  },
-  { type: 'Dragon',   tx: 52, ty: 18  },
+  // Hard zone — mountain clearings (top-right)
+  { type: 'Troll',    tx: 38, ty: 23  },  // entrance clearing
+  { type: 'Troll',    tx: 44, ty: 16  },  // mid clearing
+  { type: 'Troll',    tx: 47, ty: 18  },  // mid clearing
+  { type: 'Dragon',   tx: 52, ty:  7  },  // deep clearing
+  { type: 'Dragon',   tx: 51, ty: 10  },  // deep clearing
 ];
 
-// ── EQUIPMENT ───────────────────────────────────────────────────────
+// ── ITEMS ────────────────────────────────────────────────────────────
 const EQUIPMENT_TEMPLATES = {
-  WoodenSword:  { slot: 'weapon',    name: 'Wooden Sword',  atkBonus:  3, defBonus: 0, dropChance: 0.18 },
-  IronSword:    { slot: 'weapon',    name: 'Iron Sword',    atkBonus:  8, defBonus: 0, dropChance: 0.12 },
-  SteelBlade:   { slot: 'weapon',    name: 'Steel Blade',   atkBonus: 14, defBonus: 0, dropChance: 0.06 },
-  LeatherArmor: { slot: 'armor',     name: 'Leather Armor', atkBonus:  0, defBonus: 4, dropChance: 0.15 },
-  ChainMail:    { slot: 'armor',     name: 'Chain Mail',    atkBonus:  0, defBonus: 9, dropChance: 0.08 },
-  LuckyCharm:   { slot: 'accessory', name: 'Lucky Charm',   atkBonus:  2, defBonus: 2, dropChance: 0.10 },
+  HealthBottle: { slot: 'consumable', name: 'Health Bottle', hotHps: 5, hotDuration: 5 },
 };
 
 // ── LEVEL HELPERS ───────────────────────────────────────────────────

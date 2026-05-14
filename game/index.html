@@ -29,13 +29,18 @@
 
     <!-- WORLD UI -->
     <div id="world-ui" class="scene-ui" style="display:none">
+      <button id="btn-duel">⚔ DUEL</button>
       <div id="stats-panel">
-        <div class="stat-name" id="stat-charname">Hero</div>
+        <div id="stats-header">
+          <div class="stat-name" id="stat-charname">Hero</div>
+          <button id="btn-inventory">BAG</button>
+        </div>
         <div class="stat-row"><span>HP</span><span id="stat-hp">100/100</span></div>
         <div class="stat-row"><span>LVL</span><span id="stat-level">1</span></div>
         <div class="stat-row"><span>XP</span></div>
         <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
         <div class="stat-row"><span>Gold</span><span id="stat-gold">0</span></div>
+        <div class="stat-row"><span>CP</span><span id="stat-champion" class="cp-text">0</span></div>
         <div class="stat-row equip-row"><span>Wpn</span><span id="stat-weapon">—</span></div>
         <div class="stat-row equip-row"><span>Arm</span><span id="stat-armor">—</span></div>
       </div>
@@ -88,16 +93,58 @@
       </div>
     </div>
 
+    <!-- DUEL SEARCH POPUP -->
+    <div id="duel-popup" style="display:none">
+      <div id="duel-popup-box">
+        <div class="duel-popup-title">⚔ DUEL</div>
+        <div class="duel-search-ring"></div>
+        <div id="duel-timer-text">0:00</div>
+        <div id="duel-status-text">Searching for an opponent...</div>
+        <button id="btn-duel-cancel">Cancel</button>
+      </div>
+    </div>
+
+    <!-- INVENTORY POPUP -->
+    <div id="inventory-popup" style="display:none">
+      <div id="inventory-popup-box">
+        <div id="inv-header">
+          <span class="inv-title">INVENTORY</span>
+          <button id="btn-close-inventory">✕ CLOSE</button>
+        </div>
+        <div id="inv-content">
+          <div id="inv-equip-section">
+            <div class="inv-section-label">EQUIPPED</div>
+            <div id="inv-equip-grid"></div>
+          </div>
+          <div id="inv-char-section">
+            <canvas id="inv-char-canvas" width="120" height="170"></canvas>
+            <div id="inv-stats-text"></div>
+          </div>
+          <div id="inv-bag-section">
+            <div class="inv-section-label">BAG (100 slots)</div>
+            <div id="inv-item-grid"></div>
+          </div>
+        </div>
+      </div>
+      <div id="inv-context-menu" style="display:none">
+        <div id="inv-ctx-item-name"></div>
+        <button id="inv-ctx-use">Use</button>
+        <button id="inv-ctx-wear">Wear</button>
+        <button id="inv-ctx-unequip">Unequip</button>
+        <button id="inv-ctx-delete">Delete</button>
+      </div>
+    </div>
+
     <!-- FADE OVERLAY -->
     <div id="fade-overlay"></div>
   </div>
 
-  <script src="js/data.js"></script>
-  <script src="js/character.js"></script>
-  <script src="js/world.js"></script>
-  <script src="js/battle.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/network.js"></script>
-  <script src="js/game.js"></script>
+  <script src="js/data.js?v=7"></script>
+  <script src="js/character.js?v=7"></script>
+  <script src="js/world.js?v=7"></script>
+  <script src="js/battle.js?v=7"></script>
+  <script src="js/ui.js?v=7"></script>
+  <script src="js/network.js?v=7"></script>
+  <script src="js/game.js?v=7"></script>
 </body>
 </html>

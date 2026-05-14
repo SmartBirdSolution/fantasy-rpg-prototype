@@ -38,7 +38,10 @@ const httpServer = http.createServer((req, res) => {
 
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream',
+      'Cache-Control': 'no-store',
+    });
     res.end(data);
   });
 });
@@ -48,6 +51,56 @@ let nextId = 1;
 const wsToPlayer = new Map();   // ws → playerState
 const enemyLocks = new Map();   // enemyIdx → playerId  (currently in battle)
 const defeated   = new Set();   // enemyIdx (permanently defeated this session)
+
+// ── Duel state ────────────────────────────────────────────────────────────────
+const duelQueue    = [];         // [{ ws, id, stats }]
+const duelSessions = new Map();  // sessionId → { p1, p2, activeId, turnTimer }
+let   nextDuelId   = 1;
+const DUEL_TURN_MS = 90_000;
+
+function calcDuelDmg(atk, def, attackerDefending, defenderDefending) {
+  let base = Math.max(1, atk - def * 0.5) * (0.85 + Math.random() * 0.3);
+  if (attackerDefending) base *= 0.5;   // defensive stance reduces outgoing damage
+  if (defenderDefending) base *= 0.5;   // defender's stance reduces incoming damage
+  return Math.max(1, Math.round(base));
+}
+
+function startTurnTimer(sid) {
+  const sess = duelSessions.get(sid);
+  if (!sess) return;
+  clearTimeout(sess.turnTimer);
+  sess.turnTimer = setTimeout(() => resolveDuelTurn(sid, 0, true), DUEL_TURN_MS);
+}
+
+function resolveDuelTurn(sid, dmg, timedOut) {
+  const sess = duelSessions.get(sid);
+  if (!sess) return;
+
+  const atkKey = sess.activeId;
+  const defKey = atkKey === 'p1' ? 'p2' : 'p1';
+  const atk = sess[atkKey];
+  const def = sess[defKey];
+
+  def.currentHP = Math.max(0, def.currentHP - dmg);
+  const over = def.currentHP <= 0;
+  const xp   = Math.round(Math.max(atk.stats.level, def.stats.level) * 20 + 10);
+
+  // Switch whose turn it is for the next round
+  sess.activeId = defKey;
+
+  sendTo(atk.ws, { type: 'duel_attack', attackerIsMe: true,  dmg, timedOut,
+    yourTurn: false, over, won: over,  xpGained: over ? xp : 0 });
+  sendTo(def.ws, { type: 'duel_attack', attackerIsMe: false, dmg, timedOut,
+    yourTurn: !over, over, won: false, xpGained: 0 });
+
+  if (over) {
+    clearTimeout(sess.turnTimer);
+    duelSessions.delete(sid);
+    console.log(`  Duel ${sid} ended`);
+  } else {
+    startTurnTimer(sid);
+  }
+}
 
 function makeState(id) {
   return { id, name: `Player${id}`, race: null, cls: null,
@@ -145,15 +198,88 @@ wss.on('connection', ws => {
           cls: state.cls, x: state.x, y: state.y, scene: 'world', fightingEnemy: null } }, ws);
         break;
       }
+
+      case 'duel_queue': {
+        const qi = duelQueue.findIndex(e => e.id === id);
+        if (qi !== -1) duelQueue.splice(qi, 1);
+
+        const stats = msg.stats ?? {};
+        duelQueue.push({ ws, id, stats });
+
+        if (duelQueue.length >= 2) {
+          const a = duelQueue.shift();
+          const b = duelQueue.shift();
+          const sid      = String(nextDuelId++);
+          const firstKey = Math.random() < 0.5 ? 'p1' : 'p2';
+          const sess = {
+            p1: { ws: a.ws, id: a.id, stats: a.stats, currentHP: a.stats.maxHP, defending: false },
+            p2: { ws: b.ws, id: b.id, stats: b.stats, currentHP: b.stats.maxHP, defending: false },
+            activeId: firstKey,
+            turnTimer: null,
+          };
+          duelSessions.set(sid, sess);
+
+          const oppA = { name: b.stats.name, race: b.stats.race, cls: b.stats.cls,
+                         level: b.stats.level, maxHP: b.stats.maxHP, atk: b.stats.atk, def: b.stats.def };
+          const oppB = { name: a.stats.name, race: a.stats.race, cls: a.stats.cls,
+                         level: a.stats.level, maxHP: a.stats.maxHP, atk: a.stats.atk, def: a.stats.def };
+          sendTo(a.ws, { type: 'duel_start', sessionId: sid, opponent: oppA, yourTurn: firstKey === 'p1' });
+          sendTo(b.ws, { type: 'duel_start', sessionId: sid, opponent: oppB, yourTurn: firstKey === 'p2' });
+          startTurnTimer(sid);
+          console.log(`  Duel ${sid}: Player ${a.id} vs Player ${b.id} — ${firstKey} goes first`);
+        }
+        break;
+      }
+
+      case 'duel_cancel': {
+        const qi = duelQueue.findIndex(e => e.id === id);
+        if (qi !== -1) duelQueue.splice(qi, 1);
+        break;
+      }
+
+      case 'duel_zone': {
+        const { sessionId, zone, defending } = msg;
+        const sess = duelSessions.get(sessionId);
+        if (!sess) return;
+
+        const myKey  = sess.p1.id === id ? 'p1' : sess.p2.id === id ? 'p2' : null;
+        if (!myKey || sess.activeId !== myKey) return;  // ignore if not your turn
+
+        // Store attacker's defending state (used for outgoing damage penalty and persists for next turn)
+        sess[myKey].defending = !!defending;
+
+        clearTimeout(sess.turnTimer);
+        const defKey = myKey === 'p1' ? 'p2' : 'p1';
+        const dmg = calcDuelDmg(
+          sess[myKey].stats.atk, sess[defKey].stats.def,
+          sess[myKey].defending, sess[defKey].defending
+        );
+        resolveDuelTurn(sessionId, dmg, false);
+        break;
+      }
     }
   });
 
   ws.on('close', () => {
-    // Release any locks this player held
+    // Release any enemy locks this player held
     for (const [idx, pid] of enemyLocks) {
       if (pid === id) {
         enemyLocks.delete(idx);
         broadcast({ type: 'enemy_unlocked', enemyIdx: idx, defeated: false });
+      }
+    }
+    // Remove from duel queue
+    const dqi = duelQueue.findIndex(e => e.id === id);
+    if (dqi !== -1) duelQueue.splice(dqi, 1);
+    // End any active duel session — opponent wins by forfeit
+    for (const [sid, sess] of duelSessions) {
+      if (sess.p1.id === id || sess.p2.id === id) {
+        clearTimeout(sess.turnTimer);
+        const other = sess.p1.id === id ? sess.p2 : sess.p1;
+        const xp = Math.round(other.stats.level * 20 + 10);
+        sendTo(other.ws, { type: 'duel_forfeit', xpGained: xp });
+        duelSessions.delete(sid);
+        break;
       }
     }
     wsToPlayer.delete(ws);

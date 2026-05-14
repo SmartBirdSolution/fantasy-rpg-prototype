@@ -15,6 +15,9 @@ const Network = {
   onEnemyLocked:    null, // (idx)
   onEnemyUnlocked:  null, // (idx, wasDefeated)
   onBattleDenied:   null, // (reason)
+  onDuelStart:      null, // ({ sessionId, opponent, yourTurn })
+  onDuelAttack:     null, // ({ attackerIsMe, dmg, timedOut, yourTurn, over, won, xpGained })
+  onDuelForfeit:    null, // ({ xpGained })
 
   // Connect using the page's own host (works for localhost and LAN IPs alike)
   connect() {
@@ -76,6 +79,18 @@ const Network = {
       case 'battle_denied':
         if (this.onBattleDenied) this.onBattleDenied(msg.reason);
         break;
+
+      case 'duel_start':
+        if (this.onDuelStart) this.onDuelStart(msg);
+        break;
+
+      case 'duel_attack':
+        if (this.onDuelAttack) this.onDuelAttack(msg);
+        break;
+
+      case 'duel_forfeit':
+        if (this.onDuelForfeit) this.onDuelForfeit(msg);
+        break;
     }
   },
 
@@ -94,6 +109,18 @@ const Network = {
 
   sendBattleEnd(enemyIdx, won) {
     this._send({ type: 'battle_end', enemyIdx, won });
+  },
+
+  sendDuelQueue(stats) {
+    this._send({ type: 'duel_queue', stats });
+  },
+
+  sendDuelCancel() {
+    this._send({ type: 'duel_cancel' });
+  },
+
+  sendDuelZone(sessionId, zone, defending) {
+    this._send({ type: 'duel_zone', sessionId, zone, defending: !!defending });
   },
 
   // ── Queries ──────────────────────────────────────────────────────────
