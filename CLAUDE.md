@@ -21,8 +21,14 @@ Never skip `/git-commit` before `/git-push`. Never force-push to `main`.
 ```
 npm install       # first time only — installs the 'ws' package
 node server.js    # or: npm start
+PORT=3001 node server.js   # use a different port if 3000 is taken
 ```
 The console prints both `http://localhost:3000` and the LAN IP. Share the LAN IP with other machines on the same WiFi/network. The game works as single-player when opened as `file://` — `network.js` skips the connection automatically. The DUEL button is hidden in `file://` mode.
+
+**Port conflict:** If port 3000 is already in use, kill lingering node processes:
+```bash
+for pid in $(ls /proc | grep -E '^[0-9]+$'); do exe=$(readlink /proc/$pid/exe 2>/dev/null); if [[ "$exe" == *"node"* ]]; then kill -9 $pid; fi; done
+```
 
 **Windows PATH note:** After installing Node.js, existing terminals won't see `node`/`npm`. Refresh with:
 ```powershell
@@ -42,7 +48,10 @@ data.js → character.js → world.js → battle.js → ui.js → network.js →
 All files use `'use strict'` and expose globals (no modules). Each file depends on globals from earlier files. Always maintain this order.
 
 ### Scene state machine (`game.js`)
-`Game.scene` is the single source of truth: `'charselect' | 'world' | 'battle' | 'duel' | 'transitioning'`. The main `requestAnimationFrame` loop branches on this string. Scene transitions always go through `UI.fadeOut()` → swap scene → `UI.fadeIn()`. `worldScene.startBattleCooldown()` must be called whenever returning to the world from any combat (PvE or duel) to prevent immediate re-engagement.
+`Game.scene` is the single source of truth: `'charselect' | 'world' | 'battle' | 'duel' | 'city' | 'transitioning'`. The main `requestAnimationFrame` loop branches on this string. Scene transitions always go through `UI.fadeOut()` → swap scene → `UI.fadeIn()`.
+
+- `worldScene.startBattleCooldown()` must be called whenever returning to world from combat (PvE or duel).
+- `worldScene.startCityCooldown()` must be called when leaving the city and on initial world spawn — prevents the city prompt from firing immediately.
 
 ### Data layer (`data.js`)
 All game constants live here. Key globals: `TILE`, `TILE_META`, `RACE_DATA`, `CLASS_DATA`, `ENEMY_TYPES`, `ENEMY_SPAWNS`, `EQUIPMENT_TEMPLATES`, `MAP_DATA`, `MAP_W`, `MAP_H`, `TILE_SIZE`.
@@ -50,6 +59,7 @@ All game constants live here. Key globals: `TILE`, `TILE_META`, `RACE_DATA`, `CL
 - **`CLASS_DATA`** includes `baseRegen` (HP regen points per class, used by `PlayerCharacter.regenRate`).
 - **`EQUIPMENT_TEMPLATES`** currently only contains `HealthBottle` (`slot: 'consumable'`, `hotHps: 5`, `hotDuration: 5`). There are no equipment items — the 8-slot equip UI exists but is unused.
 - **Map layout:** 60×60 tiles, impassable mountain borders. Player starts at tile (30,30). Easy zone: top-left forest (Goblin/Wolf). Mid zone: bottom sand (Bandit/Skeleton). Hard zone: top-right mountains (Troll/Dragon) — reachable via carved grass clearings: entrance (rows 20-26, cols 36-42) → mid (rows 10-22, cols 40-51) → deep (rows 2-12, cols 49-57).
+- **Village:** tiles rows 27–33, cols 27–33. Roads cross at row 30 / col 30. City center pixel: `(30 * TILE_SIZE + TILE_SIZE/2, 30 * TILE_SIZE + TILE_SIZE/2)`.
 
 ### Character system (`character.js`)
 `Character` is the base class. `PlayerCharacter` extends it with:
@@ -74,17 +84,38 @@ Two classes live here: `BattleScene` (PvE) and `DuelBattleScene` (PvP).
 
 **Loot:** `_rollLoot()` returns an array (0 or 1 Health Bottle at 25% chance).
 
+### City system (`world.js` + `game.js` + `server.js`)
+DION is the single city. Entering hides the player from the global map; leaving spawns them at tile (34, 30) — just east of the village gate on the road.
+
+**Proximity trigger:** `WorldScene._checkCollisions` computes pixel distance from the player to city center. When `distToCity < TILE_SIZE * 2` (64 px), it fires `onCityPrompt(screenX, screenY)` once per approach (guarded by `_cityPromptShown`). When the player walks away while the prompt is open, `onCityPromptDismiss` fires automatically and `_cityCooldown` is set to prevent re-triggering.
+
+**Callbacks wired in `game.js`:**
+- `worldScene.onCityPrompt` → `UI.showCityPrompt()`
+- `worldScene.onCityPromptDismiss` → `UI.hideCityPrompt()`
+
+**Server city state:** `cityPlayers` Set in `server.js`. On `city_enter`: adds player, broadcasts `player_update` (scene `'city'`) so other clients hide them, broadcasts `city_population` to ALL connected players. On `city_leave`: removes player, broadcasts updated population. Welcome message includes `cityPopulation` so newly joined players see the correct count. `Network.cityPopulation` is the live count; `WorldScene._drawCityLabel` reads it for the map overlay.
+
+**City player filtering:** `WorldScene._handleCanvasClick` and `_drawRemotePlayers` both `continue` on `p.scene === 'city'` — city players are fully invisible and non-interactable on the world map.
+
 ### UI layer (`ui.js`)
-`UI` is a plain object with `init()` that caches DOM refs into `UI._els`. Manages scene visibility, fades, HP bars, battle log (auto-scrolls, capped at 40 lines), character select, and inventory popup.
+`UI` is a plain object with `init()` that caches DOM refs into `UI._els`. Manages scene visibility, fades, HP bars, battle log (auto-scrolls, capped at 40 lines), character select, inventory popup, and trade window.
 
 **Inventory popup:** Three-column layout — equipment slots (left), character canvas preview (center), 10×10 bag grid (right). Context menu (`#inv-context-menu`) is positioned fixed at click coordinates. Gold items show only "Delete"; consumables show only "Use"; equipment items show "Wear" (currently unreachable since no equipment drops). The context-menu click-outside listener is registered once in `UI.init()`.
 
+**`UI.showScene()`** always hides the city prompt — no explicit cleanup needed on scene transition.
+
 ### Network layer (`network.js` + `server.js`)
-`Network` is a global plain object. Callbacks set by game layer: `onDuelStart`, `onDuelAttack`, `onDuelForfeit`. The server tracks: player positions, enemy locks (one player per enemy), defeated enemies, duel queue, and active duel sessions.
+`Network` is a global plain object. Callbacks set by game layer: `onDuelStart`, `onDuelAttack`, `onDuelForfeit`, `onCityPopulation`, and the full set of `onTradeXxx` callbacks.
+
+The server tracks: player positions, enemy locks (one player per enemy), defeated enemies, city players, trade sessions, duel queue, and active duel sessions.
 
 **Duel flow:** `sendDuelQueue(stats)` → server matches two players → `duel_start` sent to both → `DuelBattleScene` created → player clicks zone → `sendDuelZone(sessionId, zone, defending)` → server calls `calcDuelDmg` (applies 0.5× for each defending player) → `duel_attack` broadcast → repeat until HP ≤ 0. Disconnect awards forfeit win + XP to the remaining player.
 
 **Enemy locking:** Enemy indices are their position in `ENEMY_SPAWNS` (stable network ID). `WorldScene` checks `Network.isEnemyLocked(idx)` and `Network.isEnemyDefeated(idx)` before allowing collision.
+
+**Trade flow:** `sendTradeRequest(toId)` → receiver accepts → server creates session → `trade_accepted` with `sessionId` sent to both → each side sends `sendTradeOffer(sessionId, items)` → both confirm → server sends `trade_complete` with `receivedItems` to each.
+
+**Critical item serialization rule:** When building a trade offer payload, always spread the full item object (`{ ...item, invIdx }`). Never hand-pick fields like `{ name, slot, amount }` — this silently drops `hotHps`, `hotDuration`, and any other properties the item needs to function after the trade.
 
 ### Adding content
 - **New enemy type:** add to `ENEMY_TYPES` in `data.js`, add `_drawXxx` in `CharacterDrawer`, add a `case` in `drawMonster`, add spawns to `ENEMY_SPAWNS`.

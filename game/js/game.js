@@ -116,14 +116,6 @@ class Game {
 
       UI.showScene('battle');
       UI.initBattleHUD(this.player, enemy);
-      UI.setDefenseEnabled(false);
-      UI.setDefenseActive(false);
-
-      document.getElementById('btn-defense').onclick = () => {
-        if (this.scene === 'battle' && this.battleScene) this.battleScene.toggleDefense();
-        else if (this.scene === 'duel'  && this.duelScene)  this.duelScene.toggleDefense();
-      };
-
       this.scene = 'battle';
       this.battleScene.init();
 
@@ -195,12 +187,6 @@ class Game {
       UI.showScene('battle');
       UI.initBattleHUD(this.player,
         { type: opp.name, level: opp.level, currentHP: opp.maxHP, maxHP: opp.maxHP });
-      UI.setDefenseEnabled(false);
-      UI.setDefenseActive(false);
-      document.getElementById('btn-defense').onclick = () => {
-        if (this.scene === 'duel' && this.duelScene) this.duelScene.toggleDefense();
-      };
-
       this.scene = 'duel';
       this.duelScene.init();
       UI.fadeIn(null);

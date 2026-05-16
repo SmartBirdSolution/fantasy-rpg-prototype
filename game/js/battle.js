@@ -30,8 +30,10 @@ class BattleScene {
     this._onAnimDone     = null;
     this._animTime       = 0;
 
-    this.zonesActive  = false;
-    this.hoveredZone  = null;
+    this.zonesActive    = false;
+    this.defenseEnabled = false;
+    this.hoveredSegment = null;
+    this._wheelCenter   = null;
 
     this.floats  = [];
     this.log     = [];
@@ -57,7 +59,8 @@ class BattleScene {
     this.canvas.addEventListener('mousemove', this._moveHandler);
 
     if (this.playerTurn) {
-      this.zonesActive = true;
+      this.zonesActive    = true;
+      this.defenseEnabled = true;
       UI.setDefenseEnabled(true);
       UI.setTurnIndicator(true);
     } else {
@@ -81,53 +84,53 @@ class BattleScene {
     };
   }
 
-  _zoneRects() {
-    const W = this.canvas.width, H = this.canvas.height;
-    const charH   = 68 * 2;
-    const groundY = H * 0.68;
-    const topY    = groundY - charH;
-    const h3      = charH / 3;
-    const panelW  = 88;
-    const panelX  = W * 0.75 - 44 - panelW - 8;
-
-    return {
-      top: { x: panelX, y: topY,          w: panelW, h: h3,   label: '▲ HEAD', color: '#501888', zone: 'top' },
-      mid: { x: panelX, y: topY + h3,     w: panelW, h: h3,   label: '● BODY', color: '#0e5828', zone: 'mid' },
-      bot: { x: panelX, y: topY + h3 * 2, w: panelW, h: h3,   label: '▼ LEGS', color: '#7a3a08', zone: 'bot' },
-    };
-  }
-
-  _hitZone(mx, my) {
-    if (!this.zonesActive) return null;
-    for (const r of Object.values(this._zoneRects())) {
-      if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) return r.zone;
-    }
-    return null;
+  _hitWheel(mx, my) {
+    if (!this._wheelCenter) return null;
+    const { cx, cy } = this._wheelCenter;
+    const dx = mx - cx, dy = my - cy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < 38 * 38 || d2 > 92 * 92) return null;
+    let a = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (a < 0) a += 360;
+    if (a >= 150 && a < 210) return 'defend';  // shield: 150°–210°
+    if (a >= 270 && a < 330) return 'top';     // HEAD:   270°–330°
+    if (a >= 330 || a < 30)  return 'mid';     // BODY:   330°–30° (wraps 0°)
+    if (a >= 30  && a < 90)  return 'bot';     // LEGS:   30°–90°
+    return null;                               // gaps:   90°–150° and 210°–270°
   }
 
   _handleClick(e) {
-    if (!this.zonesActive || this._ended || this.animState !== 'idle') return;
+    if (this._ended || this.animState !== 'idle') return;
     const { mx, my } = this._mouseCoords(e);
-    const zone = this._hitZone(mx, my);
-    if (!zone) return;
-    this.zonesActive = false;
-    this.hoveredZone = null;
+    const seg = this._hitWheel(mx, my);
+    if (!seg) return;
+    if (seg === 'defend') {
+      if (!this.defenseEnabled) return;
+      this.playerDefending = !this.playerDefending;
+      return;
+    }
+    if (!this.zonesActive) return;
+    this.zonesActive    = false;
+    this.defenseEnabled = false;
+    this.hoveredSegment = null;
     this.canvas.style.cursor = 'default';
     UI.setDefenseEnabled(false);
     UI.setTurnIndicator(false);
-    this._executePlayerAction(zone);
+    this._executePlayerAction(seg);
   }
 
   _handleMove(e) {
     const { mx, my } = this._mouseCoords(e);
-    this.hoveredZone = this._hitZone(mx, my);
-    this.canvas.style.cursor = (this.zonesActive && this.hoveredZone) ? 'pointer' : 'default';
+    const seg = this._hitWheel(mx, my);
+    this.hoveredSegment = seg;
+    const interactive = seg === 'defend' ? this.defenseEnabled
+                      : seg !== null     ? this.zonesActive : false;
+    this.canvas.style.cursor = interactive ? 'pointer' : 'default';
   }
 
   toggleDefense() {
-    if (!this.zonesActive || this._ended) return;
+    if (!this.defenseEnabled || this._ended) return;
     this.playerDefending = !this.playerDefending;
-    UI.setDefenseActive(this.playerDefending);
   }
 
   // ── COMBAT ─────────────────────────────────────────────────────────
@@ -189,9 +192,10 @@ class BattleScene {
         }
         if (!this.player.isAlive()) { this._endBattle('lose'); return; }
 
-        this.animState   = 'idle';
-        this.playerTurn  = true;
-        this.zonesActive = true;
+        this.animState      = 'idle';
+        this.playerTurn     = true;
+        this.zonesActive    = true;
+        this.defenseEnabled = true;
         UI.setDefenseEnabled(true);
         UI.setTurnIndicator(true);
       };
@@ -216,8 +220,9 @@ class BattleScene {
   _endBattle(result) {
     if (this._ended) return;
     this._ended      = true;
-    this.animState   = 'done';
-    this.zonesActive = false;
+    this.animState       = 'done';
+    this.zonesActive     = false;
+    this.defenseEnabled  = false;
     this.playerDefending = false;
     UI.setDefenseEnabled(false);
     UI.setDefenseActive(false);
@@ -341,7 +346,7 @@ class BattleScene {
 
     this._drawZoneLines(ctx, W, H);
 
-    if (this.zonesActive) this._drawZoneArrows(ctx, W, H);
+    if (this.zonesActive || this.defenseEnabled) this._drawWheel(ctx, W, H);
 
     // Floating damage numbers
     for (const f of this.floats) {
@@ -381,68 +386,624 @@ class BattleScene {
     ctx.fillText('LEGS', W * 0.75, top + h3 * 2.5 + 3);
   }
 
-  _drawZoneArrows(ctx, W, H) {
-    const rects = Object.values(this._zoneRects());
+  _drawWheel(ctx, W, H) {
+    const DEG = Math.PI / 180;
+    const OR = 92, IR = 38;
+    const cx = W * 0.50, cy = H * 0.68 - 68;
+    this._wheelCenter = { cx, cy };
+    const pulse = 0.5 + 0.5 * Math.sin(this._animTime * 4);
+    const hov = this.hoveredSegment;
+    const def = this.playerDefending;
 
-    for (const r of rects) {
-      const hover = this.hoveredZone === r.zone;
-      const alpha = hover ? 0.88 : 0.58;
+    // Outer ambient glow
+    const aglow = ctx.createRadialGradient(cx, cy, OR * 0.55, cx, cy, OR + 38);
+    aglow.addColorStop(0, `rgba(160,110,28,${0.16 + pulse * 0.10})`);
+    aglow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = aglow;
+    ctx.beginPath(); ctx.arc(cx, cy, OR + 38, 0, Math.PI * 2); ctx.fill();
 
-      // Panel background
-      const hexAlpha = Math.round(alpha * 255).toString(16).padStart(2, '0');
-      ctx.fillStyle = r.color + hexAlpha;
-      _roundRect(ctx, r.x, r.y + 2, r.w, r.h - 4, 6);
-      ctx.fill();
-
-      // Border
-      ctx.strokeStyle = hover ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)';
-      ctx.lineWidth   = hover ? 2 : 1;
-      _roundRect(ctx, r.x, r.y + 2, r.w, r.h - 4, 6);
-      ctx.stroke();
-
-      const midY = r.y + r.h / 2;
-
-      // Label
-      ctx.fillStyle  = hover ? '#ffffff' : 'rgba(255,255,255,0.9)';
-      ctx.font       = `bold ${hover ? 12 : 11}px monospace`;
-      ctx.textAlign  = 'left';
-      ctx.fillText(r.label, r.x + 10, midY + 4);
-
-      // Right-pointing arrow
-      const ax   = r.x + r.w - 10;
-      const asz  = hover ? 8 : 6;
-      ctx.fillStyle = hover ? '#fff' : 'rgba(255,255,255,0.75)';
-      ctx.beginPath();
-      ctx.moveTo(ax,       midY - asz * 0.6);
-      ctx.lineTo(ax,       midY + asz * 0.6);
-      ctx.lineTo(ax + asz, midY);
-      ctx.closePath();
-      ctx.fill();
+    // Blue defend aura
+    if (def) {
+      const dglow = ctx.createRadialGradient(cx, cy, IR, cx, cy, OR + 30);
+      dglow.addColorStop(0, `rgba(68,170,255,${0.30 + pulse * 0.22})`);
+      dglow.addColorStop(1, 'rgba(68,170,255,0)');
+      ctx.fillStyle = dglow;
+      ctx.beginPath(); ctx.arc(cx, cy, OR + 30, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Hint below panels
-    ctx.fillStyle = 'rgba(255,255,200,0.45)';
-    ctx.font      = '10px monospace';
-    ctx.textAlign = 'center';
-    const lastR   = rects[rects.length - 1];
-    ctx.fillText('CLICK TO ATTACK', lastR.x + lastR.w / 2, lastR.y + lastR.h + 14);
+    // Base crimson body (full donut)
+    ctx.beginPath();
+    ctx.arc(cx, cy, OR, 0, Math.PI * 2, false);
+    ctx.arc(cx, cy, IR, 0, Math.PI * 2, true);
+    const bgGrad = ctx.createRadialGradient(cx - 12, cy - 12, 4, cx, cy, OR);
+    bgGrad.addColorStop(0, '#3e0808');
+    bgGrad.addColorStop(0.65, '#270505');
+    bgGrad.addColorStop(1, '#170303');
+    ctx.fillStyle = bgGrad; ctx.fill();
+
+    // Segment highlight overlays
+    const segs = [
+      { id: 'defend', s: 150, e: 210, midA: 180,   color: def ? '#9a0020' : '#5a0010', enabled: this.defenseEnabled },
+      { id: 'top',    s: 270, e: 330, midA: 300,   color: '#501888', enabled: this.zonesActive },
+      { id: 'mid',    s: 330, e:  30, midA:   0,   color: '#0e5828', enabled: this.zonesActive },
+      { id: 'bot',    s:  30, e:  90, midA:  60,   color: '#7a3a08', enabled: this.zonesActive },
+    ];
+
+    for (const seg of segs) {
+      const isHov = hov === seg.id && seg.enabled;
+      const isAct = seg.id === 'defend' && def;
+      const alpha = isHov ? 0.80 : isAct ? 0.48 : (seg.enabled ? 0.22 : 0.08);
+      ctx.save(); ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(cx, cy, OR - 3, seg.s * DEG, seg.e * DEG, false);
+      ctx.arc(cx, cy, IR + 3, seg.e * DEG, seg.s * DEG, true);
+      ctx.closePath();
+      const gx = cx + Math.cos(seg.midA * DEG) * OR * 0.70;
+      const gy = cy + Math.sin(seg.midA * DEG) * OR * 0.70;
+      const sg = ctx.createRadialGradient(gx, gy, 2, cx, cy, OR);
+      sg.addColorStop(0, seg.color + 'ff'); sg.addColorStop(1, seg.color + '00');
+      ctx.fillStyle = sg; ctx.fill();
+      if (isHov) {
+        ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 20;
+        ctx.globalAlpha = 0.60;
+        ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 1.8;
+        ctx.stroke(); ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+    }
+
+    // Gold filigree: inner/outer rings + tick marks
+    ctx.save(); ctx.globalAlpha = 0.32; ctx.strokeStyle = '#b89010'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.20; ctx.lineWidth = 0.6;
+    for (let a = 0; a < 360; a += 15) {
+      const r = a * DEG, len = (a % 45 === 0) ? 9 : 4, r1 = OR - 8;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(r) * r1, cy + Math.sin(r) * r1);
+      ctx.lineTo(cx + Math.cos(r) * (r1 - len), cy + Math.sin(r) * (r1 - len));
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Gold hard rings
+    ctx.shadowColor = 'rgba(200,150,28,0.45)'; ctx.shadowBlur = 6;
+    ctx.strokeStyle = '#d4a030'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(cx, cy, OR, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#c8a030'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, IR, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 5, 0, Math.PI * 2); ctx.stroke();
+
+    // 4 ornate divider swords at gap midpoints
+    for (const a of [270, 330, 30, 90, 150, 210]) this._drawDividerSword(ctx, cx, cy, a, OR, pulse);
+
+    // Segment icons (drawn on top of base, under medallion)
+    const iconR = (OR + IR) / 2;
+    for (const seg of segs) {
+      const isHov = hov === seg.id && seg.enabled;
+      const isAct = seg.id === 'defend' && def;
+      const ix = cx + Math.cos(seg.midA * DEG) * iconR;
+      const iy = cy + Math.sin(seg.midA * DEG) * iconR;
+      if (seg.id === 'defend') {
+        this._drawShieldIcon(ctx, ix, iy, isHov, isAct, seg.enabled);
+      } else {
+        const lbl = { top: 'HEAD', mid: 'BODY', bot: 'LEGS' }[seg.id];
+        this._drawSwordIcon(ctx, ix, iy, lbl, isHov, seg.enabled, seg.midA);
+      }
+    }
+
+    this._drawCenterMedallion(ctx, cx, cy, def, pulse);
+  }
+
+  _drawDividerSword(ctx, cx, cy, angleDeg, OR, pulse) {
+    const DEG = Math.PI / 180;
+    const IR  = 38; // matches _drawWheel inner radius constant
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angleDeg * DEG);
+    // blade runs from inner ring (IR) all the way through and past outer ring
+
+    const tipX  = OR + 8;   // tip just barely past outer rim
+    const baseX = IR;        // base starts at inner ring
+    const bW    = 2.2;       // half-width at base (tapers to tip)
+
+    // Blade glow
+    ctx.shadowColor = `rgba(220,225,255,${0.22 + pulse * 0.15})`; ctx.shadowBlur = 6;
+
+    // Blade — long triangle base at IR, tip past OR
+    const blGrad = ctx.createLinearGradient(baseX, 0, tipX, 0);
+    blGrad.addColorStop(0,    '#7a8090');
+    blGrad.addColorStop(0.40, '#d8dcee');
+    blGrad.addColorStop(0.80, '#eaeeff');
+    blGrad.addColorStop(1,    '#b0b4c8');
+    ctx.fillStyle = blGrad;
+    ctx.beginPath(); ctx.moveTo(tipX, 0); ctx.lineTo(baseX, -bW); ctx.lineTo(baseX, bW); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Ridge
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.moveTo(tipX - 4, 0); ctx.lineTo(baseX + 8, 0); ctx.stroke();
+
+    ctx.restore();
+  }
+
+  _drawCenterMedallion(ctx, cx, cy, defending, pulse) {
+    const R = 36;
+
+    // Base
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    const bGrad = ctx.createRadialGradient(cx - 5, cy - 5, 1, cx, cy, R);
+    bGrad.addColorStop(0, defending ? '#1e3acc' : '#0e1a72');
+    bGrad.addColorStop(1, defending ? '#0a1a88' : '#060d42');
+    ctx.fillStyle = bGrad; ctx.fill();
+
+    // Defend inner pulse
+    if (defending) {
+      const dg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+      dg.addColorStop(0, `rgba(100,200,255,${0.32 + pulse * 0.26})`);
+      dg.addColorStop(0.65, `rgba(68,140,255,${0.10 + pulse * 0.08})`);
+      dg.addColorStop(1, 'rgba(68,140,255,0)');
+      ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Gold ring
+    ctx.shadowColor = `rgba(200,160,40,${0.42 + pulse * 0.22})`; ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#d4a030'; ctx.lineWidth = 2.8;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#8a6010'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R - 4, 0, Math.PI * 2); ctx.stroke();
+
+    // Two crossed swords — same premium style, guards meeting at center, tips up-right & up-left
+    const ms_tipX    = 33;  const ms_sharp  = 9;   const ms_bW    = 2.8;
+    const ms_gX      = 0;   const ms_gH     = 5.0; const ms_cgH   = 2.0;
+    const ms_cgW     = 2.0; const ms_gripX  = -ms_cgW;
+    const ms_hLen    = 9;   const ms_gripEnd = ms_gripX - ms_hLen;
+    const ms_pomCX   = ms_gripEnd - 2.5;
+    const ms_pomR    = 2.5; const ms_pomRy  = 1.9; const ms_gripW = 1.2;
+
+    // Draw both swords; second pass (upper-left) renders on top
+    for (const angle of [-Math.PI / 4, -3 * Math.PI / 4]) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.translate(-11, 0); // cross ~33% up the blade — closer to handle, not midpoint
+
+      // Blade
+      const ms_bl = ctx.createLinearGradient(ms_gX, -ms_bW, ms_gX, ms_bW);
+      ms_bl.addColorStop(0, '#50546a'); ms_bl.addColorStop(0.18, '#9ea2bc');
+      ms_bl.addColorStop(0.5, '#f0f4ff'); ms_bl.addColorStop(0.82, '#9ea2bc'); ms_bl.addColorStop(1, '#50546a');
+      ctx.fillStyle = ms_bl;
+      ctx.beginPath();
+      ctx.moveTo(ms_gX + 3.5, -ms_bW); ctx.lineTo(ms_tipX - ms_sharp, -ms_bW);
+      ctx.lineTo(ms_tipX, 0);
+      ctx.lineTo(ms_tipX - ms_sharp, ms_bW); ctx.lineTo(ms_gX + 3.5, ms_bW);
+      ctx.closePath(); ctx.fill();
+
+      // Ricasso
+      const ms_ric = ctx.createLinearGradient(ms_gX, -(ms_bW+0.7), ms_gX, ms_bW+0.7);
+      ms_ric.addColorStop(0, '#404460'); ms_ric.addColorStop(0.5, '#ccd0e8'); ms_ric.addColorStop(1, '#404460');
+      ctx.fillStyle = ms_ric;
+      ctx.fillRect(ms_gX, -(ms_bW + 0.7), 3.5, (ms_bW + 0.7) * 2);
+
+      // Fuller
+      ctx.strokeStyle = 'rgba(28,30,48,0.62)'; ctx.lineWidth = 0.8; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ms_tipX - ms_sharp - 1, 0); ctx.lineTo(ms_gX + 5, 0); ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      // 3 highlight bands
+      for (let i = 0; i < 3; i++) {
+        const bx = ms_gX + 5 + i * ((ms_tipX - ms_sharp - ms_gX - 7) / 2);
+        ctx.strokeStyle = `rgba(255,255,255,${0.15 + (i % 2 === 0 ? 0.13 : 0.04)})`;
+        ctx.lineWidth = 0.45;
+        ctx.beginPath(); ctx.moveTo(bx, -ms_bW * 0.62); ctx.lineTo(bx, ms_bW * 0.62); ctx.stroke();
+      }
+
+      // Edge glints
+      ctx.strokeStyle = 'rgba(215,222,255,0.35)'; ctx.lineWidth = 0.45; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ms_gX,-ms_bW); ctx.lineTo(ms_gX+3.5,-ms_bW); ctx.lineTo(ms_tipX-ms_sharp,-ms_bW); ctx.lineTo(ms_tipX,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ms_gX, ms_bW); ctx.lineTo(ms_gX+3.5, ms_bW); ctx.lineTo(ms_tipX-ms_sharp, ms_bW); ctx.lineTo(ms_tipX,0); ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      // Crossguard block
+      const ms_cg = ctx.createLinearGradient(ms_gX - ms_cgW, -ms_cgH, ms_gX - ms_cgW, ms_cgH);
+      ms_cg.addColorStop(0, '#622e06'); ms_cg.addColorStop(0.5, '#ffd700'); ms_cg.addColorStop(1, '#622e06');
+      ctx.fillStyle = ms_cg;
+      ctx.shadowColor = `rgba(190,140,28,${0.5 + pulse * 0.2})`; ctx.shadowBlur = 5;
+      _roundRect(ctx, ms_gX - ms_cgW, -ms_cgH, ms_cgW * 2, ms_cgH * 2, 1.4); ctx.fill(); ctx.shadowBlur = 0;
+
+      // Quillon arms
+      ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.strokeStyle = '#c8960c';
+      ctx.beginPath(); ctx.moveTo(ms_gX, -ms_cgH); ctx.quadraticCurveTo(ms_gX+1.5, -(ms_gH*0.55), ms_gX+1, -ms_gH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ms_gX,  ms_cgH); ctx.quadraticCurveTo(ms_gX+1.5,  ms_gH*0.55,   ms_gX+1,  ms_gH); ctx.stroke();
+      ctx.lineCap = 'butt';
+      for (const oy of [-ms_gH, ms_gH]) {
+        const og = ctx.createRadialGradient(ms_gX+0.3, oy-0.5, 0.1, ms_gX+1, oy, 2.0);
+        og.addColorStop(0,'#fff8c0'); og.addColorStop(0.5,'#ffd700'); og.addColorStop(1,'#6a4508');
+        ctx.fillStyle = og;
+        ctx.beginPath(); ctx.arc(ms_gX+1, oy, 2.0, 0, Math.PI*2); ctx.fill();
+      }
+
+      // Sapphire cabochon
+      const ms_sap = ctx.createRadialGradient(ms_gX-0.4,-0.4,0.1, ms_gX,0,1.8);
+      ms_sap.addColorStop(0,'#c8ecff'); ms_sap.addColorStop(0.35,'#2277ee'); ms_sap.addColorStop(1,'#060e50');
+      ctx.fillStyle = ms_sap;
+      ctx.shadowColor = 'rgba(35,95,255,0.65)'; ctx.shadowBlur = 5;
+      ctx.beginPath(); ctx.ellipse(ms_gX, 0, 1.8, 1.8, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+
+      // Grip
+      const ms_gr = ctx.createLinearGradient(ms_gripX, -ms_gripW, ms_gripX, ms_gripW);
+      ms_gr.addColorStop(0, '#280e04'); ms_gr.addColorStop(0.5, '#70320e'); ms_gr.addColorStop(1, '#280e04');
+      ctx.fillStyle = ms_gr;
+      ctx.fillRect(ms_gripEnd, -ms_gripW, ms_hLen, ms_gripW * 2);
+      ctx.lineWidth = 0.35;
+      for (let wx = ms_gripEnd; wx <= ms_gripX; wx += 2.5) {
+        ctx.strokeStyle = 'rgba(195,158,42,0.52)';
+        ctx.beginPath(); ctx.moveTo(wx, -ms_gripW); ctx.lineTo(wx+2.5,  ms_gripW); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(wx,  ms_gripW); ctx.lineTo(wx+2.5, -ms_gripW); ctx.stroke();
+      }
+      for (let ri = 0; ri < 2; ri++) {
+        const rx2 = ms_gripX - ms_hLen * (0.22 + ri * 0.56);
+        const rg2 = ctx.createLinearGradient(rx2, -(ms_gripW+0.8), rx2, ms_gripW+0.8);
+        rg2.addColorStop(0,'#6a4408'); rg2.addColorStop(0.5,'#ffd700'); rg2.addColorStop(1,'#6a4408');
+        ctx.fillStyle = rg2;
+        ctx.fillRect(rx2-0.8, -(ms_gripW+0.8), 1.6, (ms_gripW+0.8)*2);
+      }
+
+      // Pommel
+      const ms_pom = ctx.createRadialGradient(ms_pomCX-0.8,-0.8,0.1, ms_pomCX,0,ms_pomR);
+      ms_pom.addColorStop(0,'#fff8c0'); ms_pom.addColorStop(0.28,'#ffd700'); ms_pom.addColorStop(1,'#622e08');
+      ctx.fillStyle = ms_pom;
+      ctx.shadowColor = `rgba(195,155,38,${0.4 + pulse * 0.18})`; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.ellipse(ms_pomCX, 0, ms_pomR, ms_pomRy, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+      const ms_gem = ctx.createRadialGradient(ms_pomCX-0.4,-0.4,0.1, ms_pomCX,0,1.4);
+      ms_gem.addColorStop(0,'#c8ecff'); ms_gem.addColorStop(0.38,'#1a62cc'); ms_gem.addColorStop(1,'#060e40');
+      ctx.fillStyle = ms_gem;
+      ctx.shadowColor = 'rgba(35,95,255,0.5)'; ctx.shadowBlur = 3;
+      ctx.beginPath(); ctx.arc(ms_pomCX, 0, 1.4, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(195,158,42,0.55)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.ellipse(ms_pomCX, 0, ms_pomR, ms_pomRy, 0, 0, Math.PI*2); ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  _drawShieldIcon(ctx, x, y, hover, active, enabled) {
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    ctx.translate(x, y);
+
+    const HW = 11;   // half-width at top
+    const TY = -11;  // top y
+    const BY =  12;  // bottom tip y
+
+    // Classic heater shield — gently arched top, sides flare, wide rounded bottom
+    const BHW = 7.5;  // bottom half-width
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(-HW, TY);
+      ctx.quadraticCurveTo(0, TY - 1.5, HW, TY);                               // gentle top arch
+      ctx.bezierCurveTo(HW + 2, TY + 5, BHW + 3, BY - 5, BHW, BY);            // right side
+      ctx.quadraticCurveTo(0, BY + 6, -BHW, BY);                               // rounded bottom
+      ctx.bezierCurveTo(-BHW - 3, BY - 5, -HW - 2, TY + 5, -HW, TY);         // left side
+      ctx.closePath();
+    };
+
+    // ── Outer glow ──────────────────────────────────────────────────
+    if (active)     { ctx.shadowColor = '#3399ff'; ctx.shadowBlur = 20; }
+    else if (hover) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 14; }
+
+    // ── Main face ───────────────────────────────────────────────────
+    path();
+    const faceG = ctx.createLinearGradient(-HW, TY, HW * 0.55, BY);
+    if (active) {
+      faceG.addColorStop(0,    '#1c4ab8');
+      faceG.addColorStop(0.30, '#2a66e0');
+      faceG.addColorStop(0.65, '#1844a8');
+      faceG.addColorStop(1,    '#0c2468');
+    } else {
+      faceG.addColorStop(0,    '#3e4460');
+      faceG.addColorStop(0.30, '#5c6484');
+      faceG.addColorStop(0.65, '#3a4058');
+      faceG.addColorStop(1,    '#1c2038');
+    }
+    ctx.fillStyle = faceG; ctx.fill(); ctx.shadowBlur = 0;
+
+    // ── Top-left directional sheen ──────────────────────────────────
+    ctx.save(); path(); ctx.clip();
+    const sheenG = ctx.createLinearGradient(-HW, TY, HW * 0.28, TY + 17);
+    sheenG.addColorStop(0,    active ? 'rgba(140,205,255,0.50)' : 'rgba(255,255,255,0.42)');
+    sheenG.addColorStop(0.45, active ? 'rgba(80,160,255,0.12)'  : 'rgba(255,255,255,0.10)');
+    sheenG.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.fillStyle = sheenG; ctx.fill(); ctx.restore();
+
+    // ── Bottom depth shadow ─────────────────────────────────────────
+    ctx.save(); path(); ctx.clip();
+    const depthG = ctx.createLinearGradient(0, 0, 0, BY);
+    depthG.addColorStop(0,   'rgba(0,0,0,0)');
+    depthG.addColorStop(0.6, 'rgba(0,0,0,0.10)');
+    depthG.addColorStop(1,   'rgba(0,0,0,0.28)');
+    ctx.fillStyle = depthG; ctx.fill(); ctx.restore();
+
+    // ── Heraldic cross ──────────────────────────────────────────────
+    ctx.save(); path(); ctx.clip();
+    ctx.strokeStyle = active ? 'rgba(100,170,255,0.28)' : 'rgba(255,255,255,0.11)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.moveTo(0, TY - 2); ctx.lineTo(0, BY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-HW - 3, -1.5); ctx.lineTo(HW + 3, -1.5); ctx.stroke();
+    ctx.restore();
+
+    // ── Metallic rim ────────────────────────────────────────────────
+    path();
+    const rimG = ctx.createLinearGradient(-HW, TY, HW * 0.4, BY * 0.75);
+    if (active) {
+      rimG.addColorStop(0, '#88ccff'); rimG.addColorStop(0.45, '#55aaff'); rimG.addColorStop(1, '#1a55cc');
+    } else if (hover) {
+      rimG.addColorStop(0, '#ffe060'); rimG.addColorStop(0.45, '#ffd700'); rimG.addColorStop(1, '#a07800');
+    } else {
+      rimG.addColorStop(0, '#b0b8d0'); rimG.addColorStop(0.45, '#d0d8e8'); rimG.addColorStop(1, '#606878');
+    }
+    ctx.strokeStyle = rimG; ctx.lineWidth = 1.9; ctx.stroke();
+
+    // Inner shadow bevel
+    ctx.save(); ctx.scale(0.84, 0.84); path(); ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.32)'; ctx.lineWidth = 0.8; ctx.stroke();
+
+    // Inner highlight bevel
+    ctx.save(); ctx.scale(0.78, 0.78); path(); ctx.restore();
+    ctx.strokeStyle = active ? 'rgba(90,170,255,0.22)' : 'rgba(255,255,255,0.13)';
+    ctx.lineWidth = 0.6; ctx.stroke();
+
+
+    // ── 5 accent rivets ─────────────────────────────────────────────
+    const rc = active ? 'rgba(110,215,255,0.92)' : (hover ? 'rgba(255,215,50,0.92)' : 'rgba(200,215,242,0.84)');
+    const rivet = (rx2, ry2) => {
+      ctx.fillStyle = rc; ctx.shadowColor = rc; ctx.shadowBlur = 2.5;
+      ctx.beginPath(); ctx.arc(rx2, ry2, 1.15, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    };
+    rivet(0,         TY + 2.8);   // top centre
+    rivet(-HW*0.60,  TY + 3.5);   // top-left
+    rivet( HW*0.60,  TY + 3.5);   // top-right
+    rivet(-BHW*0.45, BY - 3.5);   // lower-left
+    rivet( BHW*0.45, BY - 3.5);   // lower-right
+
+    ctx.restore();
+
+    // DEFEND label
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    ctx.fillStyle = active ? '#66ccff' : (hover ? '#ffffff' : 'rgba(150,190,255,0.70)');
+    ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('DEFEND', x, y + BY + 9);
+    ctx.textBaseline = 'alphabetic'; ctx.restore();
+  }
+
+  _drawSwordIcon(ctx, x, y, label, hover, enabled, midAngleDeg) {
+    const DEG = Math.PI / 180;
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    ctx.translate(x, y);
+    ctx.rotate(midAngleDeg * DEG); // +x = outward (blade tip direction)
+
+    // Geometry — straight sword (parallel sides, sharp tip only at end)
+    const tipX     = 58;
+    const sharpLen = 13;
+    const gX       = 0;
+    const bW       = 4.2;
+    const gH       = 7;
+    const cgH      = 3.0;
+    const cgW      = 3.0;
+    const gripX    = gX - cgW;
+    const hLen     = 11;
+    const gripEnd  = gripX - hLen;
+    const pomCX    = gripEnd - 3.5;
+    const pomR     = 3.2;
+    const pomRy    = 2.5;
+    const gripW    = 1.7;
+
+    // ── BLADE ──────────────────────────────────────────────────────
+    const blGrad = ctx.createLinearGradient(gX, -bW, gX, bW);
+    blGrad.addColorStop(0,    '#50546a');
+    blGrad.addColorStop(0.18, '#9ea2bc');
+    blGrad.addColorStop(0.40, '#d8dcf0');
+    blGrad.addColorStop(0.50, '#f0f4ff');
+    blGrad.addColorStop(0.60, '#d8dcf0');
+    blGrad.addColorStop(0.82, '#9ea2bc');
+    blGrad.addColorStop(1,    '#50546a');
+    ctx.fillStyle = blGrad;
+    // Straight blade — parallel sides along full length, taper only at the very tip
+    ctx.beginPath();
+    ctx.moveTo(gX + 5.5, -bW);
+    ctx.lineTo(tipX - sharpLen, -bW);
+    ctx.lineTo(tipX, 0);
+    ctx.lineTo(tipX - sharpLen,  bW);
+    ctx.lineTo(gX + 5.5,  bW);
+    ctx.closePath(); ctx.fill();
+
+    // Ricasso (unsharpened base block, slightly wider)
+    const ricGrad = ctx.createLinearGradient(gX, -(bW + 0.9), gX, bW + 0.9);
+    ricGrad.addColorStop(0,   '#404460'); ricGrad.addColorStop(0.25, '#aaaecc');
+    ricGrad.addColorStop(0.5, '#ccd0e8'); ricGrad.addColorStop(0.75, '#aaaecc');
+    ricGrad.addColorStop(1,   '#404460');
+    ctx.fillStyle = ricGrad;
+    ctx.fillRect(gX, -(bW + 0.9), 5.5, (bW + 0.9) * 2);
+
+    // Central fuller groove — stops before the sharp taper
+    ctx.strokeStyle = 'rgba(28,30,48,0.62)'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(tipX - sharpLen - 2, 0); ctx.lineTo(gX + 6, 0); ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // 7 polished-steel highlight bands (uniform height across straight section)
+    for (let i = 0; i < 7; i++) {
+      const bx = gX + 7 + i * ((tipX - sharpLen - gX - 9) / 6);
+      ctx.strokeStyle = `rgba(255,255,255,${0.14 + (i % 2 === 0 ? 0.13 : 0.04)})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(bx, -bW * 0.62); ctx.lineTo(bx, bW * 0.62); ctx.stroke();
+    }
+
+    // Nordic rune etchings (Tiwaz, Hagalaz, Algiz) — spread across straight section
+    ctx.strokeStyle = 'rgba(100,110,175,0.30)'; ctx.lineWidth = 0.42;
+    let rx = gX + 12;
+    ctx.beginPath(); ctx.moveTo(rx, 1.6);  ctx.lineTo(rx, -1.6);      ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx + 1.4, 1.1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx - 1.4, 1.1); ctx.stroke();
+    rx = gX + 26;
+    ctx.beginPath(); ctx.moveTo(rx-1.2,-1.5); ctx.lineTo(rx-1.2,1.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx+1.2,-1.5); ctx.lineTo(rx+1.2,1.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx-1.2, 0);   ctx.lineTo(rx+1.2, 0);  ctx.stroke();
+    rx = gX + 38;
+    ctx.beginPath(); ctx.moveTo(rx, 1.6);  ctx.lineTo(rx, -0.3);       ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx - 1.4, -1.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx + 1.4, -1.8); ctx.stroke();
+
+    // Edge glints trace the actual blade outline
+    if (hover) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 10; }
+    ctx.strokeStyle = hover ? 'rgba(255,215,60,0.55)' : 'rgba(215,222,255,0.35)';
+    ctx.lineWidth = 0.55; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(gX,-bW); ctx.lineTo(gX+5.5,-bW); ctx.lineTo(tipX-sharpLen,-bW); ctx.lineTo(tipX,0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gX, bW); ctx.lineTo(gX+5.5, bW); ctx.lineTo(tipX-sharpLen, bW); ctx.lineTo(tipX,0); ctx.stroke();
+    ctx.lineCap = 'butt'; ctx.shadowBlur = 0;
+
+    // ── CROSSGUARD ─────────────────────────────────────────────────
+    const cgGrad = ctx.createLinearGradient(gX - cgW, -cgH, gX - cgW, cgH);
+    cgGrad.addColorStop(0,   '#622e06'); cgGrad.addColorStop(0.28, '#c88010');
+    cgGrad.addColorStop(0.5,  hover ? '#ffe060' : '#ffd700');
+    cgGrad.addColorStop(0.72,'#c88010'); cgGrad.addColorStop(1,   '#622e06');
+    ctx.fillStyle = cgGrad;
+    ctx.shadowColor = hover ? '#ffd700' : 'rgba(190,140,28,0.55)'; ctx.shadowBlur = hover ? 9 : 5;
+    _roundRect(ctx, gX - cgW, -cgH, cgW * 2, cgH * 2, 2); ctx.fill(); ctx.shadowBlur = 0;
+
+    // Alternating grooves + gold engraving
+    for (let gy = -cgH + 1.5; gy < cgH; gy += 2.0) {
+      ctx.strokeStyle = 'rgba(55,30,4,0.55)'; ctx.lineWidth = 0.45;
+      ctx.beginPath(); ctx.moveTo(gX-cgW+0.8,gy); ctx.lineTo(gX+cgW-0.8,gy); ctx.stroke();
+    }
+    for (let gy = -cgH + 2.5; gy < cgH; gy += 2.0) {
+      ctx.strokeStyle = 'rgba(255,215,70,0.28)'; ctx.lineWidth = 0.38;
+      ctx.beginPath(); ctx.moveTo(gX-cgW+1,gy); ctx.lineTo(gX+cgW-1,gy); ctx.stroke();
+    }
+
+    // Swept quillon arms (curved toward blade side)
+    ctx.lineWidth = 2.8; ctx.lineCap = 'round';
+    ctx.strokeStyle = hover ? '#ffe060' : '#c8960c';
+    ctx.beginPath(); ctx.moveTo(gX,-cgH); ctx.quadraticCurveTo(gX+2.5,-(gH*0.55),gX+1.5,-gH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gX, cgH); ctx.quadraticCurveTo(gX+2.5, gH*0.55, gX+1.5, gH); ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // Quillon tip orbs with specular
+    for (const oy of [-gH, gH]) {
+      const orbG = ctx.createRadialGradient(gX+0.5, oy-0.9, 0.3, gX+1.5, oy, 3.5);
+      orbG.addColorStop(0,'#fff8c0'); orbG.addColorStop(0.45,'#ffd700'); orbG.addColorStop(1,'#6a4508');
+      ctx.fillStyle = orbG;
+      ctx.shadowColor = 'rgba(255,200,35,0.5)'; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.arc(gX+1.5, oy, 3.5, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,210,0.52)';
+      ctx.beginPath(); ctx.ellipse(gX+0.5, oy-1.1, 1.1, 0.75, -0.4, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Sapphire cabochon in guard centre (matches wheel gem language)
+    const sapGrad = ctx.createRadialGradient(gX-0.5,-0.6,0.2, gX,0,2.8);
+    sapGrad.addColorStop(0,'#c8ecff'); sapGrad.addColorStop(0.35,'#2277ee'); sapGrad.addColorStop(1,'#060e50');
+    ctx.fillStyle = sapGrad;
+    ctx.shadowColor = 'rgba(35,95,255,0.65)'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.ellipse(gX, 0, 2.8, 2.8, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(210,240,255,0.70)';
+    ctx.beginPath(); ctx.ellipse(gX-0.8,-0.8, 1.1,0.7, -0.45, 0, Math.PI*2); ctx.fill();
+
+    // ── GRIP ───────────────────────────────────────────────────────
+    const leatherGrad = ctx.createLinearGradient(gripX, -gripW, gripX, gripW);
+    leatherGrad.addColorStop(0,   '#280e04'); leatherGrad.addColorStop(0.28,'#522206');
+    leatherGrad.addColorStop(0.5, '#70320e'); leatherGrad.addColorStop(0.72,'#522206');
+    leatherGrad.addColorStop(1,   '#280e04');
+    ctx.fillStyle = leatherGrad;
+    ctx.fillRect(gripEnd, -gripW, hLen, gripW * 2);
+
+    // Diamond cross-wrap gold wire
+    ctx.lineWidth = 0.55;
+    for (let wx = gripEnd; wx <= gripX; wx += 4) {
+      ctx.strokeStyle = hover ? 'rgba(255,220,65,0.60)' : 'rgba(195,158,42,0.52)';
+      ctx.beginPath(); ctx.moveTo(wx, -gripW); ctx.lineTo(wx+4,  gripW); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(wx,  gripW); ctx.lineTo(wx+4, -gripW); ctx.stroke();
+    }
+
+    // 3 decorative spacer rings
+    for (let ri = 0; ri < 3; ri++) {
+      const ringX = gripX - hLen * (0.18 + ri * 0.32);
+      const ringG = ctx.createLinearGradient(ringX, -(gripW+1.2), ringX, gripW+1.2);
+      ringG.addColorStop(0,'#6a4408'); ringG.addColorStop(0.45,'#ffd700');
+      ringG.addColorStop(0.55,'#fff8a0'); ringG.addColorStop(1,'#6a4408');
+      ctx.fillStyle = ringG;
+      ctx.fillRect(ringX-1.2, -(gripW+1.2), 2.4, (gripW+1.2)*2);
+      ctx.strokeStyle = 'rgba(70,40,4,0.38)'; ctx.lineWidth = 0.32;
+      ctx.beginPath(); ctx.moveTo(ringX-1.2,-(gripW+0.35)); ctx.lineTo(ringX+1.2,-(gripW+0.35)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ringX-1.2, gripW+0.35);   ctx.lineTo(ringX+1.2, gripW+0.35);   ctx.stroke();
+    }
+
+    // ── POMMEL ─────────────────────────────────────────────────────
+    const pomBodyGrad = ctx.createRadialGradient(pomCX-1.2,-1.2,0.3, pomCX,0,pomR);
+    pomBodyGrad.addColorStop(0,   '#fff8c0'); pomBodyGrad.addColorStop(0.28,'#ffd700');
+    pomBodyGrad.addColorStop(0.62,'#c09010'); pomBodyGrad.addColorStop(1,   '#622e08');
+    ctx.fillStyle = pomBodyGrad;
+    ctx.shadowColor = hover ? '#ffd700' : 'rgba(195,155,38,0.50)'; ctx.shadowBlur = hover ? 8 : 5;
+    ctx.beginPath(); ctx.ellipse(pomCX, 0, pomR, pomRy, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+
+    // Facet grid (horizontal + vertical)
+    ctx.strokeStyle = 'rgba(80,48,5,0.42)'; ctx.lineWidth = 0.38;
+    for (let fi = -2; fi <= 2; fi++) {
+      const fy  = fi * (pomRy / 2.6);
+      const fx  = Math.sqrt(Math.max(0, 1 - (fy/pomRy)**2)) * pomR * 0.88;
+      ctx.beginPath(); ctx.moveTo(pomCX-fx, fy); ctx.lineTo(pomCX+fx, fy); ctx.stroke();
+      const fxv = fi * (pomR / 2.6);
+      const fyv = Math.sqrt(Math.max(0, 1 - (fxv/pomR)**2)) * pomRy * 0.88;
+      ctx.beginPath(); ctx.moveTo(pomCX+fxv,-fyv); ctx.lineTo(pomCX+fxv,fyv); ctx.stroke();
+    }
+
+    // 4 secondary bosses (N/S/E/W)
+    for (const [bx,by] of [[0,-(pomRy-1.8)],[0,pomRy-1.8],[-(pomR-1.8),0],[pomR-1.8,0]]) {
+      const bossG = ctx.createRadialGradient(pomCX+bx-0.3,by-0.3,0.1, pomCX+bx,by,1.3);
+      bossG.addColorStop(0,'#fff8c0'); bossG.addColorStop(0.5,'#ffd700'); bossG.addColorStop(1,'#6a4808');
+      ctx.fillStyle = bossG;
+      ctx.beginPath(); ctx.arc(pomCX+bx, by, 1.3, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Central pommel gem — same blue gem language as guard sapphire & wheel medallion
+    const gemGrad = ctx.createRadialGradient(pomCX-0.5,-0.5,0.15, pomCX,0,2.2);
+    gemGrad.addColorStop(0,'#c8ecff'); gemGrad.addColorStop(0.38,'#1a62cc'); gemGrad.addColorStop(1,'#060e40');
+    ctx.fillStyle = gemGrad;
+    ctx.shadowColor = 'rgba(35,95,255,0.55)'; ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.arc(pomCX, 0, 2.2, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(200,235,255,0.68)';
+    ctx.beginPath(); ctx.ellipse(pomCX-0.6,-0.6, 0.9,0.6,-0.5, 0, Math.PI*2); ctx.fill();
+
+    // Pommel rim
+    ctx.strokeStyle = hover ? '#ffe060' : 'rgba(195,158,42,0.62)'; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.ellipse(pomCX, 0, pomR, pomRy, 0, 0, Math.PI*2); ctx.stroke();
+
+    ctx.restore();
+
+    // Label (perpendicular to blade)
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    const perpA = (midAngleDeg + 90) * DEG;
+    const lx = x + Math.cos(perpA) * 18;
+    const ly = y + Math.sin(perpA) * 18;
+    ctx.fillStyle = hover ? '#ffd700' : 'rgba(215,195,155,0.85)';
+    ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, lx, ly);
+    ctx.textBaseline = 'alphabetic'; ctx.restore();
   }
 
   _drawDefenseShield(ctx, cx, cy) {
     const pulse = 0.5 + 0.5 * Math.sin(this._animTime * 4);
     const charCY = cy - 68;
-
-    // Soft aura
     const r   = 48 + pulse * 8;
     const grd = ctx.createRadialGradient(cx, charCY, 0, cx, charCY, r);
     grd.addColorStop(0, `rgba(68,170,255,${0.18 + pulse * 0.14})`);
-    grd.addColorStop(1,  'rgba(68,170,255,0)');
+    grd.addColorStop(1, 'rgba(68,170,255,0)');
     ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.arc(cx, charCY, r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, charCY, r, 0, Math.PI * 2); ctx.fill();
 
-    // Heater shield shape
     const sx = cx - 11, sy = cy - 106, sw = 22, sh = 28;
     ctx.fillStyle   = `rgba(68,170,255,${0.50 + pulse * 0.28})`;
     ctx.strokeStyle = `rgba(180,225,255,${0.75 + pulse * 0.25})`;
@@ -453,8 +1014,7 @@ class BattleScene {
     ctx.lineTo(sx + sw / 2, sy + sh);
     ctx.lineTo(sx,          sy + sh * 0.42);
     ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    ctx.fill(); ctx.stroke();
   }
 }
 
@@ -476,9 +1036,11 @@ class DuelBattleScene {
     this._onAnimDone = null;
     this._animTime   = 0;
 
-    this.zonesActive = false;
-    this.hoveredZone = null;
-    this.floats      = [];
+    this.zonesActive    = false;
+    this.defenseEnabled = false;
+    this.hoveredSegment = null;
+    this._wheelCenter   = null;
+    this.floats         = [];
 
     this._countdown       = 90;
     this._countdownHandle = null;
@@ -523,14 +1085,15 @@ class DuelBattleScene {
   }
 
   toggleDefense() {
+    if (!this.defenseEnabled || this._ended) return;
     this.playerDefending = !this.playerDefending;
-    UI.setDefenseActive(this.playerDefending);
   }
 
   // ── TURN STATE ─────────────────────────────────────────────────────
   _activateMyTurn() {
-    this.state       = 'picking';
-    this.zonesActive = true;
+    this.state          = 'picking';
+    this.zonesActive    = true;
+    this.defenseEnabled = true;
     UI.setDefenseEnabled(true);
     UI.setDefenseActive(this.playerDefending);
     this._startCountdown();
@@ -538,8 +1101,9 @@ class DuelBattleScene {
   }
 
   _setWaiting() {
-    this.state       = 'waiting';
-    this.zonesActive = false;
+    this.state          = 'waiting';
+    this.zonesActive    = false;
+    this.defenseEnabled = false;
     this.canvas.style.cursor = 'default';
     UI.setDefenseEnabled(false);
     // Show opponent countdown (display-only — server enforces the real timer)
@@ -590,48 +1154,50 @@ class DuelBattleScene {
     };
   }
 
-  _zoneRects() {
-    const W = this.canvas.width, H = this.canvas.height;
-    const charH  = 68 * 2;
-    const groundY = H * 0.68;
-    const topY   = groundY - charH;
-    const h3     = charH / 3;
-    const panelW = 88;
-    const panelX = W * 0.75 - 44 - panelW - 8;
-    return {
-      top: { x: panelX, y: topY,          w: panelW, h: h3, label: '▲ HEAD', color: '#501888', zone: 'top' },
-      mid: { x: panelX, y: topY + h3,     w: panelW, h: h3, label: '● BODY', color: '#0e5828', zone: 'mid' },
-      bot: { x: panelX, y: topY + h3 * 2, w: panelW, h: h3, label: '▼ LEGS', color: '#7a3a08', zone: 'bot' },
-    };
-  }
-
-  _hitZone(mx, my) {
-    if (!this.zonesActive) return null;
-    for (const r of Object.values(this._zoneRects())) {
-      if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) return r.zone;
-    }
-    return null;
+  _hitWheel(mx, my) {
+    if (!this._wheelCenter) return null;
+    const { cx, cy } = this._wheelCenter;
+    const dx = mx - cx, dy = my - cy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < 38 * 38 || d2 > 92 * 92) return null;
+    let a = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (a < 0) a += 360;
+    if (a >= 150 && a < 210) return 'defend';  // shield: 150°–210°
+    if (a >= 270 && a < 330) return 'top';     // HEAD:   270°–330°
+    if (a >= 330 || a < 30)  return 'mid';     // BODY:   330°–30° (wraps 0°)
+    if (a >= 30  && a < 90)  return 'bot';     // LEGS:   30°–90°
+    return null;                               // gaps:   90°–150° and 210°–270°
   }
 
   _handleClick(e) {
-    if (!this.zonesActive || this._ended || this.state !== 'picking') return;
+    if (this._ended || this.animState !== 'idle') return;
     const { mx, my } = this._mouseCoords(e);
-    const zone = this._hitZone(mx, my);
-    if (!zone) return;
+    const seg = this._hitWheel(mx, my);
+    if (!seg) return;
+    if (seg === 'defend') {
+      if (!this.defenseEnabled) return;
+      this.playerDefending = !this.playerDefending;
+      return;
+    }
+    if (!this.zonesActive || this.state !== 'picking') return;
     this._stopCountdown();
-    this.zonesActive = false;
-    this.hoveredZone = null;
+    this.zonesActive    = false;
+    this.defenseEnabled = false;
+    this.hoveredSegment = null;
     this.canvas.style.cursor = 'default';
     this.state = 'waiting';
     const el = document.getElementById('turn-indicator');
     if (el) { el.className = 'duel-resolve'; el.textContent = 'ATTACKING...'; }
-    Network.sendDuelZone(this.sessionId, zone, this.playerDefending);
+    Network.sendDuelZone(this.sessionId, seg, this.playerDefending);
   }
 
   _handleMove(e) {
     const { mx, my } = this._mouseCoords(e);
-    this.hoveredZone = this._hitZone(mx, my);
-    this.canvas.style.cursor = (this.zonesActive && this.hoveredZone) ? 'pointer' : 'default';
+    const seg = this._hitWheel(mx, my);
+    this.hoveredSegment = seg;
+    const interactive = seg === 'defend' ? this.defenseEnabled
+                      : seg !== null     ? this.zonesActive : false;
+    this.canvas.style.cursor = interactive ? 'pointer' : 'default';
   }
 
   // ── NETWORK EVENTS ─────────────────────────────────────────────────
@@ -786,7 +1352,7 @@ class DuelBattleScene {
     ctx.restore();
 
     this._drawZoneLines(ctx, W, H);
-    if (this.zonesActive) this._drawZoneArrows(ctx, W, H);
+    if (this.zonesActive || this.defenseEnabled) this._drawWheel(ctx, W, H);
 
     // Opponent-turn waiting pulse
     if (this.state === 'waiting') {
@@ -851,26 +1417,634 @@ class DuelBattleScene {
     ctx.fillText('HEAD', W * 0.75, top + h3 * 0.5 + 3); ctx.fillText('BODY', W * 0.75, top + h3 * 1.5 + 3); ctx.fillText('LEGS', W * 0.75, top + h3 * 2.5 + 3);
   }
 
-  _drawZoneArrows(ctx, W, H) {
-    const rects = Object.values(this._zoneRects());
-    for (const r of rects) {
-      const hover = this.hoveredZone === r.zone;
-      const alpha = hover ? 0.88 : 0.58;
-      ctx.fillStyle = r.color + Math.round(alpha * 255).toString(16).padStart(2, '0');
-      _roundRect(ctx, r.x, r.y + 2, r.w, r.h - 4, 6); ctx.fill();
-      ctx.strokeStyle = hover ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)';
-      ctx.lineWidth   = hover ? 2 : 1;
-      _roundRect(ctx, r.x, r.y + 2, r.w, r.h - 4, 6); ctx.stroke();
-      const midY = r.y + r.h / 2;
-      ctx.fillStyle = hover ? '#ffffff' : 'rgba(255,255,255,0.9)';
-      ctx.font      = `bold ${hover ? 12 : 11}px monospace`; ctx.textAlign = 'left';
-      ctx.fillText(r.label, r.x + 10, midY + 4);
-      const ax = r.x + r.w - 10, asz = hover ? 8 : 6;
-      ctx.fillStyle = hover ? '#fff' : 'rgba(255,255,255,0.75)';
-      ctx.beginPath(); ctx.moveTo(ax, midY - asz * 0.6); ctx.lineTo(ax, midY + asz * 0.6); ctx.lineTo(ax + asz, midY); ctx.closePath(); ctx.fill();
+  _drawWheel(ctx, W, H) {
+    const DEG = Math.PI / 180;
+    const OR = 92, IR = 38;
+    const cx = W * 0.50, cy = H * 0.68 - 68;
+    this._wheelCenter = { cx, cy };
+    const pulse = 0.5 + 0.5 * Math.sin(this._animTime * 4);
+    const hov = this.hoveredSegment;
+    const def = this.playerDefending;
+
+    // Outer ambient glow
+    const aglow = ctx.createRadialGradient(cx, cy, OR * 0.55, cx, cy, OR + 38);
+    aglow.addColorStop(0, `rgba(160,110,28,${0.16 + pulse * 0.10})`);
+    aglow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = aglow;
+    ctx.beginPath(); ctx.arc(cx, cy, OR + 38, 0, Math.PI * 2); ctx.fill();
+
+    // Blue defend aura
+    if (def) {
+      const dglow = ctx.createRadialGradient(cx, cy, IR, cx, cy, OR + 30);
+      dglow.addColorStop(0, `rgba(68,170,255,${0.30 + pulse * 0.22})`);
+      dglow.addColorStop(1, 'rgba(68,170,255,0)');
+      ctx.fillStyle = dglow;
+      ctx.beginPath(); ctx.arc(cx, cy, OR + 30, 0, Math.PI * 2); ctx.fill();
     }
-    const lastR = rects[rects.length - 1];
-    ctx.fillStyle = 'rgba(255,255,200,0.45)'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
-    ctx.fillText('CLICK TO ATTACK', lastR.x + lastR.w / 2, lastR.y + lastR.h + 14);
+
+    // Base crimson body (full donut)
+    ctx.beginPath();
+    ctx.arc(cx, cy, OR, 0, Math.PI * 2, false);
+    ctx.arc(cx, cy, IR, 0, Math.PI * 2, true);
+    const bgGrad = ctx.createRadialGradient(cx - 12, cy - 12, 4, cx, cy, OR);
+    bgGrad.addColorStop(0, '#3e0808');
+    bgGrad.addColorStop(0.65, '#270505');
+    bgGrad.addColorStop(1, '#170303');
+    ctx.fillStyle = bgGrad; ctx.fill();
+
+    // Segment highlight overlays
+    const segs = [
+      { id: 'defend', s: 150, e: 210, midA: 180,   color: def ? '#9a0020' : '#5a0010', enabled: this.defenseEnabled },
+      { id: 'top',    s: 270, e: 330, midA: 300,   color: '#501888', enabled: this.zonesActive },
+      { id: 'mid',    s: 330, e:  30, midA:   0,   color: '#0e5828', enabled: this.zonesActive },
+      { id: 'bot',    s:  30, e:  90, midA:  60,   color: '#7a3a08', enabled: this.zonesActive },
+    ];
+
+    for (const seg of segs) {
+      const isHov = hov === seg.id && seg.enabled;
+      const isAct = seg.id === 'defend' && def;
+      const alpha = isHov ? 0.80 : isAct ? 0.48 : (seg.enabled ? 0.22 : 0.08);
+      ctx.save(); ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(cx, cy, OR - 3, seg.s * DEG, seg.e * DEG, false);
+      ctx.arc(cx, cy, IR + 3, seg.e * DEG, seg.s * DEG, true);
+      ctx.closePath();
+      const gx = cx + Math.cos(seg.midA * DEG) * OR * 0.70;
+      const gy = cy + Math.sin(seg.midA * DEG) * OR * 0.70;
+      const sg = ctx.createRadialGradient(gx, gy, 2, cx, cy, OR);
+      sg.addColorStop(0, seg.color + 'ff'); sg.addColorStop(1, seg.color + '00');
+      ctx.fillStyle = sg; ctx.fill();
+      if (isHov) {
+        ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 20;
+        ctx.globalAlpha = 0.60;
+        ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 1.8;
+        ctx.stroke(); ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+    }
+
+    // Gold filigree: inner/outer rings + tick marks
+    ctx.save(); ctx.globalAlpha = 0.32; ctx.strokeStyle = '#b89010'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.20; ctx.lineWidth = 0.6;
+    for (let a = 0; a < 360; a += 15) {
+      const r = a * DEG, len = (a % 45 === 0) ? 9 : 4, r1 = OR - 8;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(r) * r1, cy + Math.sin(r) * r1);
+      ctx.lineTo(cx + Math.cos(r) * (r1 - len), cy + Math.sin(r) * (r1 - len));
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Gold hard rings
+    ctx.shadowColor = 'rgba(200,150,28,0.45)'; ctx.shadowBlur = 6;
+    ctx.strokeStyle = '#d4a030'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(cx, cy, OR, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#c8a030'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, IR, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 5, 0, Math.PI * 2); ctx.stroke();
+
+    // 4 ornate divider swords at gap midpoints
+    for (const a of [270, 330, 30, 90, 150, 210]) this._drawDividerSword(ctx, cx, cy, a, OR, pulse);
+
+    // Segment icons (drawn on top of base, under medallion)
+    const iconR = (OR + IR) / 2;
+    for (const seg of segs) {
+      const isHov = hov === seg.id && seg.enabled;
+      const isAct = seg.id === 'defend' && def;
+      const ix = cx + Math.cos(seg.midA * DEG) * iconR;
+      const iy = cy + Math.sin(seg.midA * DEG) * iconR;
+      if (seg.id === 'defend') {
+        this._drawShieldIcon(ctx, ix, iy, isHov, isAct, seg.enabled);
+      } else {
+        const lbl = { top: 'HEAD', mid: 'BODY', bot: 'LEGS' }[seg.id];
+        this._drawSwordIcon(ctx, ix, iy, lbl, isHov, seg.enabled, seg.midA);
+      }
+    }
+
+    this._drawCenterMedallion(ctx, cx, cy, def, pulse);
+  }
+
+  _drawDividerSword(ctx, cx, cy, angleDeg, OR, pulse) {
+    const DEG = Math.PI / 180;
+    const IR  = 38; // matches _drawWheel inner radius constant
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angleDeg * DEG);
+    // blade runs from inner ring (IR) all the way through and past outer ring
+
+    const tipX  = OR + 8;   // tip just barely past outer rim
+    const baseX = IR;        // base starts at inner ring
+    const bW    = 2.2;       // half-width at base (tapers to tip)
+
+    // Blade glow
+    ctx.shadowColor = `rgba(220,225,255,${0.22 + pulse * 0.15})`; ctx.shadowBlur = 6;
+
+    // Blade — long triangle base at IR, tip past OR
+    const blGrad = ctx.createLinearGradient(baseX, 0, tipX, 0);
+    blGrad.addColorStop(0,    '#7a8090');
+    blGrad.addColorStop(0.40, '#d8dcee');
+    blGrad.addColorStop(0.80, '#eaeeff');
+    blGrad.addColorStop(1,    '#b0b4c8');
+    ctx.fillStyle = blGrad;
+    ctx.beginPath(); ctx.moveTo(tipX, 0); ctx.lineTo(baseX, -bW); ctx.lineTo(baseX, bW); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Ridge
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.moveTo(tipX - 4, 0); ctx.lineTo(baseX + 8, 0); ctx.stroke();
+
+    ctx.restore();
+  }
+
+  _drawCenterMedallion(ctx, cx, cy, defending, pulse) {
+    const R = 36;
+
+    // Base
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    const bGrad = ctx.createRadialGradient(cx - 5, cy - 5, 1, cx, cy, R);
+    bGrad.addColorStop(0, defending ? '#1e3acc' : '#0e1a72');
+    bGrad.addColorStop(1, defending ? '#0a1a88' : '#060d42');
+    ctx.fillStyle = bGrad; ctx.fill();
+
+    // Defend inner pulse
+    if (defending) {
+      const dg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+      dg.addColorStop(0, `rgba(100,200,255,${0.32 + pulse * 0.26})`);
+      dg.addColorStop(0.65, `rgba(68,140,255,${0.10 + pulse * 0.08})`);
+      dg.addColorStop(1, 'rgba(68,140,255,0)');
+      ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Gold ring
+    ctx.shadowColor = `rgba(200,160,40,${0.42 + pulse * 0.22})`; ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#d4a030'; ctx.lineWidth = 2.8;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#8a6010'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R - 4, 0, Math.PI * 2); ctx.stroke();
+
+    // Two crossed swords — same premium style, guards meeting at center, tips up-right & up-left
+    const ms_tipX    = 33;  const ms_sharp  = 9;   const ms_bW    = 2.8;
+    const ms_gX      = 0;   const ms_gH     = 5.0; const ms_cgH   = 2.0;
+    const ms_cgW     = 2.0; const ms_gripX  = -ms_cgW;
+    const ms_hLen    = 9;   const ms_gripEnd = ms_gripX - ms_hLen;
+    const ms_pomCX   = ms_gripEnd - 2.5;
+    const ms_pomR    = 2.5; const ms_pomRy  = 1.9; const ms_gripW = 1.2;
+
+    // Draw both swords; second pass (upper-left) renders on top
+    for (const angle of [-Math.PI / 4, -3 * Math.PI / 4]) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.translate(-11, 0); // cross ~33% up the blade — closer to handle, not midpoint
+
+      // Blade
+      const ms_bl = ctx.createLinearGradient(ms_gX, -ms_bW, ms_gX, ms_bW);
+      ms_bl.addColorStop(0, '#50546a'); ms_bl.addColorStop(0.18, '#9ea2bc');
+      ms_bl.addColorStop(0.5, '#f0f4ff'); ms_bl.addColorStop(0.82, '#9ea2bc'); ms_bl.addColorStop(1, '#50546a');
+      ctx.fillStyle = ms_bl;
+      ctx.beginPath();
+      ctx.moveTo(ms_gX + 3.5, -ms_bW); ctx.lineTo(ms_tipX - ms_sharp, -ms_bW);
+      ctx.lineTo(ms_tipX, 0);
+      ctx.lineTo(ms_tipX - ms_sharp, ms_bW); ctx.lineTo(ms_gX + 3.5, ms_bW);
+      ctx.closePath(); ctx.fill();
+
+      // Ricasso
+      const ms_ric = ctx.createLinearGradient(ms_gX, -(ms_bW+0.7), ms_gX, ms_bW+0.7);
+      ms_ric.addColorStop(0, '#404460'); ms_ric.addColorStop(0.5, '#ccd0e8'); ms_ric.addColorStop(1, '#404460');
+      ctx.fillStyle = ms_ric;
+      ctx.fillRect(ms_gX, -(ms_bW + 0.7), 3.5, (ms_bW + 0.7) * 2);
+
+      // Fuller
+      ctx.strokeStyle = 'rgba(28,30,48,0.62)'; ctx.lineWidth = 0.8; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ms_tipX - ms_sharp - 1, 0); ctx.lineTo(ms_gX + 5, 0); ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      // 3 highlight bands
+      for (let i = 0; i < 3; i++) {
+        const bx = ms_gX + 5 + i * ((ms_tipX - ms_sharp - ms_gX - 7) / 2);
+        ctx.strokeStyle = `rgba(255,255,255,${0.15 + (i % 2 === 0 ? 0.13 : 0.04)})`;
+        ctx.lineWidth = 0.45;
+        ctx.beginPath(); ctx.moveTo(bx, -ms_bW * 0.62); ctx.lineTo(bx, ms_bW * 0.62); ctx.stroke();
+      }
+
+      // Edge glints
+      ctx.strokeStyle = 'rgba(215,222,255,0.35)'; ctx.lineWidth = 0.45; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ms_gX,-ms_bW); ctx.lineTo(ms_gX+3.5,-ms_bW); ctx.lineTo(ms_tipX-ms_sharp,-ms_bW); ctx.lineTo(ms_tipX,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ms_gX, ms_bW); ctx.lineTo(ms_gX+3.5, ms_bW); ctx.lineTo(ms_tipX-ms_sharp, ms_bW); ctx.lineTo(ms_tipX,0); ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      // Crossguard block
+      const ms_cg = ctx.createLinearGradient(ms_gX - ms_cgW, -ms_cgH, ms_gX - ms_cgW, ms_cgH);
+      ms_cg.addColorStop(0, '#622e06'); ms_cg.addColorStop(0.5, '#ffd700'); ms_cg.addColorStop(1, '#622e06');
+      ctx.fillStyle = ms_cg;
+      ctx.shadowColor = `rgba(190,140,28,${0.5 + pulse * 0.2})`; ctx.shadowBlur = 5;
+      _roundRect(ctx, ms_gX - ms_cgW, -ms_cgH, ms_cgW * 2, ms_cgH * 2, 1.4); ctx.fill(); ctx.shadowBlur = 0;
+
+      // Quillon arms
+      ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.strokeStyle = '#c8960c';
+      ctx.beginPath(); ctx.moveTo(ms_gX, -ms_cgH); ctx.quadraticCurveTo(ms_gX+1.5, -(ms_gH*0.55), ms_gX+1, -ms_gH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ms_gX,  ms_cgH); ctx.quadraticCurveTo(ms_gX+1.5,  ms_gH*0.55,   ms_gX+1,  ms_gH); ctx.stroke();
+      ctx.lineCap = 'butt';
+      for (const oy of [-ms_gH, ms_gH]) {
+        const og = ctx.createRadialGradient(ms_gX+0.3, oy-0.5, 0.1, ms_gX+1, oy, 2.0);
+        og.addColorStop(0,'#fff8c0'); og.addColorStop(0.5,'#ffd700'); og.addColorStop(1,'#6a4508');
+        ctx.fillStyle = og;
+        ctx.beginPath(); ctx.arc(ms_gX+1, oy, 2.0, 0, Math.PI*2); ctx.fill();
+      }
+
+      // Sapphire cabochon
+      const ms_sap = ctx.createRadialGradient(ms_gX-0.4,-0.4,0.1, ms_gX,0,1.8);
+      ms_sap.addColorStop(0,'#c8ecff'); ms_sap.addColorStop(0.35,'#2277ee'); ms_sap.addColorStop(1,'#060e50');
+      ctx.fillStyle = ms_sap;
+      ctx.shadowColor = 'rgba(35,95,255,0.65)'; ctx.shadowBlur = 5;
+      ctx.beginPath(); ctx.ellipse(ms_gX, 0, 1.8, 1.8, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+
+      // Grip
+      const ms_gr = ctx.createLinearGradient(ms_gripX, -ms_gripW, ms_gripX, ms_gripW);
+      ms_gr.addColorStop(0, '#280e04'); ms_gr.addColorStop(0.5, '#70320e'); ms_gr.addColorStop(1, '#280e04');
+      ctx.fillStyle = ms_gr;
+      ctx.fillRect(ms_gripEnd, -ms_gripW, ms_hLen, ms_gripW * 2);
+      ctx.lineWidth = 0.35;
+      for (let wx = ms_gripEnd; wx <= ms_gripX; wx += 2.5) {
+        ctx.strokeStyle = 'rgba(195,158,42,0.52)';
+        ctx.beginPath(); ctx.moveTo(wx, -ms_gripW); ctx.lineTo(wx+2.5,  ms_gripW); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(wx,  ms_gripW); ctx.lineTo(wx+2.5, -ms_gripW); ctx.stroke();
+      }
+      for (let ri = 0; ri < 2; ri++) {
+        const rx2 = ms_gripX - ms_hLen * (0.22 + ri * 0.56);
+        const rg2 = ctx.createLinearGradient(rx2, -(ms_gripW+0.8), rx2, ms_gripW+0.8);
+        rg2.addColorStop(0,'#6a4408'); rg2.addColorStop(0.5,'#ffd700'); rg2.addColorStop(1,'#6a4408');
+        ctx.fillStyle = rg2;
+        ctx.fillRect(rx2-0.8, -(ms_gripW+0.8), 1.6, (ms_gripW+0.8)*2);
+      }
+
+      // Pommel
+      const ms_pom = ctx.createRadialGradient(ms_pomCX-0.8,-0.8,0.1, ms_pomCX,0,ms_pomR);
+      ms_pom.addColorStop(0,'#fff8c0'); ms_pom.addColorStop(0.28,'#ffd700'); ms_pom.addColorStop(1,'#622e08');
+      ctx.fillStyle = ms_pom;
+      ctx.shadowColor = `rgba(195,155,38,${0.4 + pulse * 0.18})`; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.ellipse(ms_pomCX, 0, ms_pomR, ms_pomRy, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+      const ms_gem = ctx.createRadialGradient(ms_pomCX-0.4,-0.4,0.1, ms_pomCX,0,1.4);
+      ms_gem.addColorStop(0,'#c8ecff'); ms_gem.addColorStop(0.38,'#1a62cc'); ms_gem.addColorStop(1,'#060e40');
+      ctx.fillStyle = ms_gem;
+      ctx.shadowColor = 'rgba(35,95,255,0.5)'; ctx.shadowBlur = 3;
+      ctx.beginPath(); ctx.arc(ms_pomCX, 0, 1.4, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(195,158,42,0.55)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.ellipse(ms_pomCX, 0, ms_pomR, ms_pomRy, 0, 0, Math.PI*2); ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  _drawShieldIcon(ctx, x, y, hover, active, enabled) {
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    ctx.translate(x, y);
+
+    const HW = 11;   // half-width at top
+    const TY = -11;  // top y
+    const BY =  12;  // bottom tip y
+
+    // Classic heater shield — gently arched top, sides flare, wide rounded bottom
+    const BHW = 7.5;  // bottom half-width
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(-HW, TY);
+      ctx.quadraticCurveTo(0, TY - 1.5, HW, TY);                               // gentle top arch
+      ctx.bezierCurveTo(HW + 2, TY + 5, BHW + 3, BY - 5, BHW, BY);            // right side
+      ctx.quadraticCurveTo(0, BY + 6, -BHW, BY);                               // rounded bottom
+      ctx.bezierCurveTo(-BHW - 3, BY - 5, -HW - 2, TY + 5, -HW, TY);         // left side
+      ctx.closePath();
+    };
+
+    // ── Outer glow ──────────────────────────────────────────────────
+    if (active)     { ctx.shadowColor = '#3399ff'; ctx.shadowBlur = 20; }
+    else if (hover) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 14; }
+
+    // ── Main face ───────────────────────────────────────────────────
+    path();
+    const faceG = ctx.createLinearGradient(-HW, TY, HW * 0.55, BY);
+    if (active) {
+      faceG.addColorStop(0,    '#1c4ab8');
+      faceG.addColorStop(0.30, '#2a66e0');
+      faceG.addColorStop(0.65, '#1844a8');
+      faceG.addColorStop(1,    '#0c2468');
+    } else {
+      faceG.addColorStop(0,    '#3e4460');
+      faceG.addColorStop(0.30, '#5c6484');
+      faceG.addColorStop(0.65, '#3a4058');
+      faceG.addColorStop(1,    '#1c2038');
+    }
+    ctx.fillStyle = faceG; ctx.fill(); ctx.shadowBlur = 0;
+
+    // ── Top-left directional sheen ──────────────────────────────────
+    ctx.save(); path(); ctx.clip();
+    const sheenG = ctx.createLinearGradient(-HW, TY, HW * 0.28, TY + 17);
+    sheenG.addColorStop(0,    active ? 'rgba(140,205,255,0.50)' : 'rgba(255,255,255,0.42)');
+    sheenG.addColorStop(0.45, active ? 'rgba(80,160,255,0.12)'  : 'rgba(255,255,255,0.10)');
+    sheenG.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.fillStyle = sheenG; ctx.fill(); ctx.restore();
+
+    // ── Bottom depth shadow ─────────────────────────────────────────
+    ctx.save(); path(); ctx.clip();
+    const depthG = ctx.createLinearGradient(0, 0, 0, BY);
+    depthG.addColorStop(0,   'rgba(0,0,0,0)');
+    depthG.addColorStop(0.6, 'rgba(0,0,0,0.10)');
+    depthG.addColorStop(1,   'rgba(0,0,0,0.28)');
+    ctx.fillStyle = depthG; ctx.fill(); ctx.restore();
+
+    // ── Heraldic cross ──────────────────────────────────────────────
+    ctx.save(); path(); ctx.clip();
+    ctx.strokeStyle = active ? 'rgba(100,170,255,0.28)' : 'rgba(255,255,255,0.11)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.moveTo(0, TY - 2); ctx.lineTo(0, BY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-HW - 3, -1.5); ctx.lineTo(HW + 3, -1.5); ctx.stroke();
+    ctx.restore();
+
+    // ── Metallic rim ────────────────────────────────────────────────
+    path();
+    const rimG = ctx.createLinearGradient(-HW, TY, HW * 0.4, BY * 0.75);
+    if (active) {
+      rimG.addColorStop(0, '#88ccff'); rimG.addColorStop(0.45, '#55aaff'); rimG.addColorStop(1, '#1a55cc');
+    } else if (hover) {
+      rimG.addColorStop(0, '#ffe060'); rimG.addColorStop(0.45, '#ffd700'); rimG.addColorStop(1, '#a07800');
+    } else {
+      rimG.addColorStop(0, '#b0b8d0'); rimG.addColorStop(0.45, '#d0d8e8'); rimG.addColorStop(1, '#606878');
+    }
+    ctx.strokeStyle = rimG; ctx.lineWidth = 1.9; ctx.stroke();
+
+    // Inner shadow bevel
+    ctx.save(); ctx.scale(0.84, 0.84); path(); ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.32)'; ctx.lineWidth = 0.8; ctx.stroke();
+
+    // Inner highlight bevel
+    ctx.save(); ctx.scale(0.78, 0.78); path(); ctx.restore();
+    ctx.strokeStyle = active ? 'rgba(90,170,255,0.22)' : 'rgba(255,255,255,0.13)';
+    ctx.lineWidth = 0.6; ctx.stroke();
+
+
+    // ── 5 accent rivets ─────────────────────────────────────────────
+    const rc = active ? 'rgba(110,215,255,0.92)' : (hover ? 'rgba(255,215,50,0.92)' : 'rgba(200,215,242,0.84)');
+    const rivet = (rx2, ry2) => {
+      ctx.fillStyle = rc; ctx.shadowColor = rc; ctx.shadowBlur = 2.5;
+      ctx.beginPath(); ctx.arc(rx2, ry2, 1.15, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    };
+    rivet(0,         TY + 2.8);   // top centre
+    rivet(-HW*0.60,  TY + 3.5);   // top-left
+    rivet( HW*0.60,  TY + 3.5);   // top-right
+    rivet(-BHW*0.45, BY - 3.5);   // lower-left
+    rivet( BHW*0.45, BY - 3.5);   // lower-right
+
+    ctx.restore();
+
+    // DEFEND label
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    ctx.fillStyle = active ? '#66ccff' : (hover ? '#ffffff' : 'rgba(150,190,255,0.70)');
+    ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('DEFEND', x, y + BY + 9);
+    ctx.textBaseline = 'alphabetic'; ctx.restore();
+  }
+
+  _drawSwordIcon(ctx, x, y, label, hover, enabled, midAngleDeg) {
+    const DEG = Math.PI / 180;
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    ctx.translate(x, y);
+    ctx.rotate(midAngleDeg * DEG); // +x = outward (blade tip direction)
+
+    // Geometry — straight sword (parallel sides, sharp tip only at end)
+    const tipX     = 58;
+    const sharpLen = 13;
+    const gX       = 0;
+    const bW       = 4.2;
+    const gH       = 7;
+    const cgH      = 3.0;
+    const cgW      = 3.0;
+    const gripX    = gX - cgW;
+    const hLen     = 11;
+    const gripEnd  = gripX - hLen;
+    const pomCX    = gripEnd - 3.5;
+    const pomR     = 3.2;
+    const pomRy    = 2.5;
+    const gripW    = 1.7;
+
+    // ── BLADE ──────────────────────────────────────────────────────
+    const blGrad = ctx.createLinearGradient(gX, -bW, gX, bW);
+    blGrad.addColorStop(0,    '#50546a');
+    blGrad.addColorStop(0.18, '#9ea2bc');
+    blGrad.addColorStop(0.40, '#d8dcf0');
+    blGrad.addColorStop(0.50, '#f0f4ff');
+    blGrad.addColorStop(0.60, '#d8dcf0');
+    blGrad.addColorStop(0.82, '#9ea2bc');
+    blGrad.addColorStop(1,    '#50546a');
+    ctx.fillStyle = blGrad;
+    // Straight blade — parallel sides along full length, taper only at the very tip
+    ctx.beginPath();
+    ctx.moveTo(gX + 5.5, -bW);
+    ctx.lineTo(tipX - sharpLen, -bW);
+    ctx.lineTo(tipX, 0);
+    ctx.lineTo(tipX - sharpLen,  bW);
+    ctx.lineTo(gX + 5.5,  bW);
+    ctx.closePath(); ctx.fill();
+
+    // Ricasso (unsharpened base block, slightly wider)
+    const ricGrad = ctx.createLinearGradient(gX, -(bW + 0.9), gX, bW + 0.9);
+    ricGrad.addColorStop(0,   '#404460'); ricGrad.addColorStop(0.25, '#aaaecc');
+    ricGrad.addColorStop(0.5, '#ccd0e8'); ricGrad.addColorStop(0.75, '#aaaecc');
+    ricGrad.addColorStop(1,   '#404460');
+    ctx.fillStyle = ricGrad;
+    ctx.fillRect(gX, -(bW + 0.9), 5.5, (bW + 0.9) * 2);
+
+    // Central fuller groove — stops before the sharp taper
+    ctx.strokeStyle = 'rgba(28,30,48,0.62)'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(tipX - sharpLen - 2, 0); ctx.lineTo(gX + 6, 0); ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // 7 polished-steel highlight bands (uniform height across straight section)
+    for (let i = 0; i < 7; i++) {
+      const bx = gX + 7 + i * ((tipX - sharpLen - gX - 9) / 6);
+      ctx.strokeStyle = `rgba(255,255,255,${0.14 + (i % 2 === 0 ? 0.13 : 0.04)})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(bx, -bW * 0.62); ctx.lineTo(bx, bW * 0.62); ctx.stroke();
+    }
+
+    // Nordic rune etchings (Tiwaz, Hagalaz, Algiz) — spread across straight section
+    ctx.strokeStyle = 'rgba(100,110,175,0.30)'; ctx.lineWidth = 0.42;
+    let rx = gX + 12;
+    ctx.beginPath(); ctx.moveTo(rx, 1.6);  ctx.lineTo(rx, -1.6);      ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx + 1.4, 1.1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx - 1.4, 1.1); ctx.stroke();
+    rx = gX + 26;
+    ctx.beginPath(); ctx.moveTo(rx-1.2,-1.5); ctx.lineTo(rx-1.2,1.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx+1.2,-1.5); ctx.lineTo(rx+1.2,1.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx-1.2, 0);   ctx.lineTo(rx+1.2, 0);  ctx.stroke();
+    rx = gX + 38;
+    ctx.beginPath(); ctx.moveTo(rx, 1.6);  ctx.lineTo(rx, -0.3);       ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx - 1.4, -1.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, -0.3); ctx.lineTo(rx + 1.4, -1.8); ctx.stroke();
+
+    // Edge glints trace the actual blade outline
+    if (hover) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 10; }
+    ctx.strokeStyle = hover ? 'rgba(255,215,60,0.55)' : 'rgba(215,222,255,0.35)';
+    ctx.lineWidth = 0.55; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(gX,-bW); ctx.lineTo(gX+5.5,-bW); ctx.lineTo(tipX-sharpLen,-bW); ctx.lineTo(tipX,0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gX, bW); ctx.lineTo(gX+5.5, bW); ctx.lineTo(tipX-sharpLen, bW); ctx.lineTo(tipX,0); ctx.stroke();
+    ctx.lineCap = 'butt'; ctx.shadowBlur = 0;
+
+    // ── CROSSGUARD ─────────────────────────────────────────────────
+    const cgGrad = ctx.createLinearGradient(gX - cgW, -cgH, gX - cgW, cgH);
+    cgGrad.addColorStop(0,   '#622e06'); cgGrad.addColorStop(0.28, '#c88010');
+    cgGrad.addColorStop(0.5,  hover ? '#ffe060' : '#ffd700');
+    cgGrad.addColorStop(0.72,'#c88010'); cgGrad.addColorStop(1,   '#622e06');
+    ctx.fillStyle = cgGrad;
+    ctx.shadowColor = hover ? '#ffd700' : 'rgba(190,140,28,0.55)'; ctx.shadowBlur = hover ? 9 : 5;
+    _roundRect(ctx, gX - cgW, -cgH, cgW * 2, cgH * 2, 2); ctx.fill(); ctx.shadowBlur = 0;
+
+    // Alternating grooves + gold engraving
+    for (let gy = -cgH + 1.5; gy < cgH; gy += 2.0) {
+      ctx.strokeStyle = 'rgba(55,30,4,0.55)'; ctx.lineWidth = 0.45;
+      ctx.beginPath(); ctx.moveTo(gX-cgW+0.8,gy); ctx.lineTo(gX+cgW-0.8,gy); ctx.stroke();
+    }
+    for (let gy = -cgH + 2.5; gy < cgH; gy += 2.0) {
+      ctx.strokeStyle = 'rgba(255,215,70,0.28)'; ctx.lineWidth = 0.38;
+      ctx.beginPath(); ctx.moveTo(gX-cgW+1,gy); ctx.lineTo(gX+cgW-1,gy); ctx.stroke();
+    }
+
+    // Swept quillon arms (curved toward blade side)
+    ctx.lineWidth = 2.8; ctx.lineCap = 'round';
+    ctx.strokeStyle = hover ? '#ffe060' : '#c8960c';
+    ctx.beginPath(); ctx.moveTo(gX,-cgH); ctx.quadraticCurveTo(gX+2.5,-(gH*0.55),gX+1.5,-gH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gX, cgH); ctx.quadraticCurveTo(gX+2.5, gH*0.55, gX+1.5, gH); ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // Quillon tip orbs with specular
+    for (const oy of [-gH, gH]) {
+      const orbG = ctx.createRadialGradient(gX+0.5, oy-0.9, 0.3, gX+1.5, oy, 3.5);
+      orbG.addColorStop(0,'#fff8c0'); orbG.addColorStop(0.45,'#ffd700'); orbG.addColorStop(1,'#6a4508');
+      ctx.fillStyle = orbG;
+      ctx.shadowColor = 'rgba(255,200,35,0.5)'; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.arc(gX+1.5, oy, 3.5, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,210,0.52)';
+      ctx.beginPath(); ctx.ellipse(gX+0.5, oy-1.1, 1.1, 0.75, -0.4, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Sapphire cabochon in guard centre (matches wheel gem language)
+    const sapGrad = ctx.createRadialGradient(gX-0.5,-0.6,0.2, gX,0,2.8);
+    sapGrad.addColorStop(0,'#c8ecff'); sapGrad.addColorStop(0.35,'#2277ee'); sapGrad.addColorStop(1,'#060e50');
+    ctx.fillStyle = sapGrad;
+    ctx.shadowColor = 'rgba(35,95,255,0.65)'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.ellipse(gX, 0, 2.8, 2.8, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(210,240,255,0.70)';
+    ctx.beginPath(); ctx.ellipse(gX-0.8,-0.8, 1.1,0.7, -0.45, 0, Math.PI*2); ctx.fill();
+
+    // ── GRIP ───────────────────────────────────────────────────────
+    const leatherGrad = ctx.createLinearGradient(gripX, -gripW, gripX, gripW);
+    leatherGrad.addColorStop(0,   '#280e04'); leatherGrad.addColorStop(0.28,'#522206');
+    leatherGrad.addColorStop(0.5, '#70320e'); leatherGrad.addColorStop(0.72,'#522206');
+    leatherGrad.addColorStop(1,   '#280e04');
+    ctx.fillStyle = leatherGrad;
+    ctx.fillRect(gripEnd, -gripW, hLen, gripW * 2);
+
+    // Diamond cross-wrap gold wire
+    ctx.lineWidth = 0.55;
+    for (let wx = gripEnd; wx <= gripX; wx += 4) {
+      ctx.strokeStyle = hover ? 'rgba(255,220,65,0.60)' : 'rgba(195,158,42,0.52)';
+      ctx.beginPath(); ctx.moveTo(wx, -gripW); ctx.lineTo(wx+4,  gripW); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(wx,  gripW); ctx.lineTo(wx+4, -gripW); ctx.stroke();
+    }
+
+    // 3 decorative spacer rings
+    for (let ri = 0; ri < 3; ri++) {
+      const ringX = gripX - hLen * (0.18 + ri * 0.32);
+      const ringG = ctx.createLinearGradient(ringX, -(gripW+1.2), ringX, gripW+1.2);
+      ringG.addColorStop(0,'#6a4408'); ringG.addColorStop(0.45,'#ffd700');
+      ringG.addColorStop(0.55,'#fff8a0'); ringG.addColorStop(1,'#6a4408');
+      ctx.fillStyle = ringG;
+      ctx.fillRect(ringX-1.2, -(gripW+1.2), 2.4, (gripW+1.2)*2);
+      ctx.strokeStyle = 'rgba(70,40,4,0.38)'; ctx.lineWidth = 0.32;
+      ctx.beginPath(); ctx.moveTo(ringX-1.2,-(gripW+0.35)); ctx.lineTo(ringX+1.2,-(gripW+0.35)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ringX-1.2, gripW+0.35);   ctx.lineTo(ringX+1.2, gripW+0.35);   ctx.stroke();
+    }
+
+    // ── POMMEL ─────────────────────────────────────────────────────
+    const pomBodyGrad = ctx.createRadialGradient(pomCX-1.2,-1.2,0.3, pomCX,0,pomR);
+    pomBodyGrad.addColorStop(0,   '#fff8c0'); pomBodyGrad.addColorStop(0.28,'#ffd700');
+    pomBodyGrad.addColorStop(0.62,'#c09010'); pomBodyGrad.addColorStop(1,   '#622e08');
+    ctx.fillStyle = pomBodyGrad;
+    ctx.shadowColor = hover ? '#ffd700' : 'rgba(195,155,38,0.50)'; ctx.shadowBlur = hover ? 8 : 5;
+    ctx.beginPath(); ctx.ellipse(pomCX, 0, pomR, pomRy, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+
+    // Facet grid (horizontal + vertical)
+    ctx.strokeStyle = 'rgba(80,48,5,0.42)'; ctx.lineWidth = 0.38;
+    for (let fi = -2; fi <= 2; fi++) {
+      const fy  = fi * (pomRy / 2.6);
+      const fx  = Math.sqrt(Math.max(0, 1 - (fy/pomRy)**2)) * pomR * 0.88;
+      ctx.beginPath(); ctx.moveTo(pomCX-fx, fy); ctx.lineTo(pomCX+fx, fy); ctx.stroke();
+      const fxv = fi * (pomR / 2.6);
+      const fyv = Math.sqrt(Math.max(0, 1 - (fxv/pomR)**2)) * pomRy * 0.88;
+      ctx.beginPath(); ctx.moveTo(pomCX+fxv,-fyv); ctx.lineTo(pomCX+fxv,fyv); ctx.stroke();
+    }
+
+    // 4 secondary bosses (N/S/E/W)
+    for (const [bx,by] of [[0,-(pomRy-1.8)],[0,pomRy-1.8],[-(pomR-1.8),0],[pomR-1.8,0]]) {
+      const bossG = ctx.createRadialGradient(pomCX+bx-0.3,by-0.3,0.1, pomCX+bx,by,1.3);
+      bossG.addColorStop(0,'#fff8c0'); bossG.addColorStop(0.5,'#ffd700'); bossG.addColorStop(1,'#6a4808');
+      ctx.fillStyle = bossG;
+      ctx.beginPath(); ctx.arc(pomCX+bx, by, 1.3, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Central pommel gem — same blue gem language as guard sapphire & wheel medallion
+    const gemGrad = ctx.createRadialGradient(pomCX-0.5,-0.5,0.15, pomCX,0,2.2);
+    gemGrad.addColorStop(0,'#c8ecff'); gemGrad.addColorStop(0.38,'#1a62cc'); gemGrad.addColorStop(1,'#060e40');
+    ctx.fillStyle = gemGrad;
+    ctx.shadowColor = 'rgba(35,95,255,0.55)'; ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.arc(pomCX, 0, 2.2, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(200,235,255,0.68)';
+    ctx.beginPath(); ctx.ellipse(pomCX-0.6,-0.6, 0.9,0.6,-0.5, 0, Math.PI*2); ctx.fill();
+
+    // Pommel rim
+    ctx.strokeStyle = hover ? '#ffe060' : 'rgba(195,158,42,0.62)'; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.ellipse(pomCX, 0, pomR, pomRy, 0, 0, Math.PI*2); ctx.stroke();
+
+    ctx.restore();
+
+    // Label (perpendicular to blade)
+    ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
+    const perpA = (midAngleDeg + 90) * DEG;
+    const lx = x + Math.cos(perpA) * 18;
+    const ly = y + Math.sin(perpA) * 18;
+    ctx.fillStyle = hover ? '#ffd700' : 'rgba(215,195,155,0.85)';
+    ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, lx, ly);
+    ctx.textBaseline = 'alphabetic'; ctx.restore();
+  }
+
+  _drawDefenseShield(ctx, cx, cy) {
+    const pulse = 0.5 + 0.5 * Math.sin(this._animTime * 4);
+    const charCY = cy - 68;
+    const r   = 48 + pulse * 8;
+    const grd = ctx.createRadialGradient(cx, charCY, 0, cx, charCY, r);
+    grd.addColorStop(0, `rgba(68,170,255,${0.18 + pulse * 0.14})`);
+    grd.addColorStop(1, 'rgba(68,170,255,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(cx, charCY, r, 0, Math.PI * 2); ctx.fill();
+
+    const sx = cx - 11, sy = cy - 106, sw = 22, sh = 28;
+    ctx.fillStyle   = `rgba(68,170,255,${0.50 + pulse * 0.28})`;
+    ctx.strokeStyle = `rgba(180,225,255,${0.75 + pulse * 0.25})`;
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx + sw / 2, sy);
+    ctx.lineTo(sx + sw,     sy + sh * 0.42);
+    ctx.lineTo(sx + sw / 2, sy + sh);
+    ctx.lineTo(sx,          sy + sh * 0.42);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
   }
 }

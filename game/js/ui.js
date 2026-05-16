@@ -33,9 +33,6 @@ const UI = {
       turnIndicator: document.getElementById('turn-indicator'),
       battleLog:     document.getElementById('battle-log'),
 
-      btnDefense:    document.getElementById('btn-defense'),
-      defenseStatus: document.getElementById('defense-status'),
-
       // Duel
       btnDuel:       document.getElementById('btn-duel'),
       duelPopup:     document.getElementById('duel-popup'),
@@ -257,14 +254,8 @@ const UI = {
     el.style.color = isPlayer ? '#ffd700' : '#ff6060';
   },
 
-  setDefenseEnabled(on) {
-    this._els.btnDefense.disabled = !on;
-  },
-
-  setDefenseActive(on) {
-    this._els.btnDefense.classList.toggle('active', on);
-    this._els.defenseStatus.textContent = on ? 'ON' : 'OFF';
-  },
+  setDefenseEnabled(_on) {},
+  setDefenseActive(_on) {},
 
   appendBattleLog(msg, cls = '') {
     const p = document.createElement('p');
