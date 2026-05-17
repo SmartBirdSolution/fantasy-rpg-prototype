@@ -200,10 +200,15 @@ const PROFESSION_NAMES = ['Adventurer', 'Champion', 'Legend'];
 const COMBO_ZONE_KEYS  = ['top', 'mid', 'bot'];
 const COMBO_ZONE_ICONS = { top: '▲', mid: '◆', bot: '▼' };
 
-const COMBO_LIFE_ON_HIT_MULT = 0.30; // fraction of last-hit damage restored as HP
+const COMBO_LIFE_ON_HIT_MULT    = 0.30; // level-1 combo: fraction of last-hit dmg → HP
+const COMBO_LIFE_ON_HIT_MULT_L3 = 0.50; // level-3 combo: fraction of last-hit dmg → HP
 
-// Indexed by level. ability:'lifeOnHit' → floor(lastHitDmg × mult) restored HP
+// Indexed by level → array of possible combo defs (one is randomly chosen on unlock).
+// null means no combo unlocked at that level.
+// Add more entries to a level's pool to give the system variety when assigning combos.
 const COMBO_DEFS = [
-  null,                                                                                        // [0] unused
-  { name: 'Combination 1', length: 2, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT }, // [1] level 1
+  null,  // [0] unused
+  [{ name: 'Combination 1', length: 2, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT }],    // [1] level 1
+  null,  // [2] no combo at level 2
+  [{ name: 'Combination 2', length: 3, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT_L3 }], // [3] level 3
 ];

@@ -83,9 +83,15 @@ class PlayerCharacter extends Character {
     this._hitBuffer = [];
   }
 
+  _pickComboDef(level) {
+    const pool = COMBO_DEFS[level];
+    if (!pool || !pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   _initCombos() {
     for (let lv = 1; lv <= this.level; lv++) {
-      const def = COMBO_DEFS[lv];
+      const def = this._pickComboDef(lv);
       if (def) this._addCombo(def);
     }
   }
@@ -119,7 +125,7 @@ class PlayerCharacter extends Character {
     this.baseAtk +=  2;
     this.baseDef +=  1;
     this.currentHP = this.maxHP;
-    const newDef = COMBO_DEFS[this.level];
+    const newDef = this._pickComboDef(this.level);
     if (newDef) this._addCombo(newDef);
   }
 
