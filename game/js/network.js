@@ -26,6 +26,9 @@ const Network = {
   // Combination heal callback (set by DuelBattleScene)
   onComboHeal: null, // ({ sessionId, total })
 
+  // Extra crit callback (set by DuelBattleScene)
+  onExtraCrit: null, // ({ sessionId, dmg })
+
   // City callbacks (set by game layer)
   onCityPopulation: null, // (count)
 
@@ -135,6 +138,10 @@ const Network = {
         if (this.onComboHeal) this.onComboHeal(msg);
         break;
 
+      case 'extra_crit':
+        if (this.onExtraCrit) this.onExtraCrit(msg);
+        break;
+
       case 'trade_request':
         if (this.onTradeRequest) this.onTradeRequest(msg);
         break;
@@ -205,6 +212,10 @@ const Network = {
 
   sendComboHeal(sessionId, total) {
     this._send({ type: 'combo_heal', sessionId, total });
+  },
+
+  sendExtraCrit(sessionId, dmg) {
+    this._send({ type: 'extra_crit', sessionId, dmg });
   },
 
   // ── City senders ─────────────────────────────────────────────────────

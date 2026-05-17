@@ -200,15 +200,23 @@ const PROFESSION_NAMES = ['Adventurer', 'Champion', 'Legend'];
 const COMBO_ZONE_KEYS  = ['top', 'mid', 'bot'];
 const COMBO_ZONE_ICONS = { top: '▲', mid: '◆', bot: '▼' };
 
-const COMBO_LIFE_ON_HIT_MULT    = 0.30; // level-1 combo: fraction of last-hit dmg → HP
-const COMBO_LIFE_ON_HIT_MULT_L3 = 0.50; // level-3 combo: fraction of last-hit dmg → HP
+const COMBO_LIFE_ON_HIT_MULT    = 0.30; // Vampire Power Lvl 1: fraction of last-hit dmg → HP
+const COMBO_LIFE_ON_HIT_MULT_L3 = 0.50; // Vampire Power Lvl 2: fraction of last-hit dmg → HP
+const COMBO_EXTRA_CRIT_MULT     = 0.50; // Fear Move Lvl 1: fraction of last-hit dmg → bonus dmg
+const COMBO_EXTRA_CRIT_MULT_L2  = 0.70; // Fear Move Lvl 2: fraction of last-hit dmg → bonus dmg
 
 // Indexed by level → array of possible combo defs (one is randomly chosen on unlock).
 // null means no combo unlocked at that level.
 // Add more entries to a level's pool to give the system variety when assigning combos.
 const COMBO_DEFS = [
   null,  // [0] unused
-  [{ name: 'Combination 1', length: 2, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT }],    // [1] level 1
+  [
+    { name: 'Vampire Power Lvl 1', length: 2, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT },
+    { name: 'Fear Move Lvl 1',     length: 2, ability: 'extraCrit', mult: COMBO_EXTRA_CRIT_MULT  },
+  ],
   null,  // [2] no combo at level 2
-  [{ name: 'Combination 2', length: 3, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT_L3 }], // [3] level 3
+  [
+    { name: 'Vampire Power Lvl 2', length: 3, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT_L3 },
+    { name: 'Fear Move Lvl 2',     length: 3, ability: 'extraCrit', mult: COMBO_EXTRA_CRIT_MULT_L2  },
+  ],
 ];

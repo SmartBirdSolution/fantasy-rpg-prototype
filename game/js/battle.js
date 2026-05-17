@@ -44,6 +44,7 @@ class BattleScene {
 
     this._hitBuffer        = [];
     this._pendingComboHeal = 0;
+    this._pendingExtraCrit = 0;
     this._comboFlashT      = 0;
     this._comboJumpT       = 0;
 
@@ -248,6 +249,24 @@ class BattleScene {
         }
       }
       if (!this.enemy.isAlive()) { this._endBattle('win'); return; }
+
+      if (this._pendingExtraCrit > 0) {
+        const xDmg = this._pendingExtraCrit;
+        this._pendingExtraCrit = 0;
+        this.animState   = 'playerAtk';
+        this.animT       = 0;
+        this._comboJumpT = 1.0;
+        this._onAnimDone = () => {
+          this.enemy.takeDamage(xDmg);
+          this._spawnFloat(xDmg, 'enemy');
+          this._log(`✦ Fear Move! Extra hit for ${xDmg} damage!`, 'log-loot');
+          if (!this.enemy.isAlive()) { this._endBattle('win'); return; }
+          UI.setTurnIndicator(false);
+          doEnemyPhase();
+        };
+        return;
+      }
+
       UI.setTurnIndicator(false);
       doEnemyPhase();
     };
@@ -342,7 +361,11 @@ class BattleScene {
       this._log(`✦ Discovered: ${combo.name}!`, 'log-loot');
       UI.updateCombatBar(this.player);
     }
-    this._pendingComboHeal = Math.max(1, Math.floor(dmg * combo.def.mult));
+    if (combo.def.ability === 'lifeOnHit') {
+      this._pendingComboHeal = Math.max(1, Math.floor(dmg * combo.def.mult));
+    } else if (combo.def.ability === 'extraCrit') {
+      this._pendingExtraCrit = Math.max(1, Math.floor(dmg * combo.def.mult));
+    }
     this._comboFlashT = 1.0;
     this._comboJumpT  = 1.0;
   }
@@ -1353,6 +1376,7 @@ class DuelBattleScene {
 
     this._hitBuffer        = [];
     this._pendingComboHeal = 0;
+    this._pendingExtraCrit = 0;
     this._comboFlashT      = 0;
     this._comboJumpT       = 0;
     this._lastSentZone     = null;
@@ -1393,6 +1417,12 @@ class DuelBattleScene {
       this._oppHotRemaining = info.hotDuration;
       this._oppHotAccum     = 0;
     };
+    Network.onExtraCrit = ({ sessionId, dmg }) => {
+      if (sessionId !== this.sessionId || this._ended) return;
+      this.player.currentHP = Math.max(0, this.player.currentHP - dmg);
+      this._spawnFloat(dmg, 'player');
+      this._log(`✦ ${this.opponent.name} used Fear Move! +${dmg} extra damage!`, 'log-system');
+    };
 
     if (this._firstTurn) {
       this._log('You go first — pick a zone!', 'log-system');
@@ -1413,6 +1443,7 @@ class DuelBattleScene {
     Network.onDuelForfeit = null;
     Network.onDuelHeal    = null;
     Network.onComboHeal   = null;
+    Network.onExtraCrit   = null;
   }
 
   toggleDefense() {
@@ -1586,6 +1617,22 @@ class DuelBattleScene {
           UI.updateCombatBar(this.player);
           Network.sendComboHeal(this.sessionId, h);
         }
+        if (this._pendingExtraCrit > 0) {
+          const xDmg = this._pendingExtraCrit;
+          this._pendingExtraCrit = 0;
+          this.animState   = 'playerAtk';
+          this.animT       = 0;
+          this._comboJumpT = 1.0;
+          this._onAnimDone = () => {
+            this.opponentCurrentHP = Math.max(0, this.opponentCurrentHP - xDmg);
+            this._spawnFloat(xDmg, 'opponent');
+            this._log(`✦ Fear Move! Extra hit for ${xDmg} damage!`, 'log-loot');
+            Network.sendExtraCrit(this.sessionId, xDmg);
+            this.animState = 'idle';
+            this._afterAttack(data);
+          };
+          return;
+        }
       } else {
         this.player.takeDamage(data.dmg);
         this._spawnFloat(data.dmg, 'player');
@@ -1651,7 +1698,11 @@ class DuelBattleScene {
       this._log(`✦ Discovered: ${combo.name}!`, 'log-loot');
       UI.updateCombatBar(this.player);
     }
-    this._pendingComboHeal = Math.max(1, Math.floor(dmg * combo.def.mult));
+    if (combo.def.ability === 'lifeOnHit') {
+      this._pendingComboHeal = Math.max(1, Math.floor(dmg * combo.def.mult));
+    } else if (combo.def.ability === 'extraCrit') {
+      this._pendingExtraCrit = Math.max(1, Math.floor(dmg * combo.def.mult));
+    }
     this._comboFlashT = 1.0;
     this._comboJumpT  = 1.0;
   }
