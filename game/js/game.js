@@ -8,6 +8,7 @@ class Game {
 
     this.player       = null;
     this.worldScene   = null;
+    this.cityScene    = null;
     this.battleScene  = null;
     this.currentEnemy    = null;
     this.currentEnemyIdx = null;
@@ -50,6 +51,7 @@ class Game {
     this.player = new PlayerCharacter(race, cls);
 
     this.worldScene = new WorldScene(this.canvas, this.player);
+    this.cityScene  = new CityScene(this.canvas);
     this.worldScene.init();
     this.worldScene.startCityCooldown(); // grace period so prompt doesn't fire on spawn
     this.worldScene.onBattleStart = (e, idx) => this._startBattle(e, idx);
@@ -416,6 +418,10 @@ class Game {
       this.duelScene.draw();
       UI.updateBattleHUD(this.player,
         { currentHP: this.duelScene.opponentCurrentHP, maxHP: this.duelScene.opponent.maxHP });
+
+    } else if (this.scene === 'city' && this.cityScene) {
+      this.cityScene.update(dt);
+      this.cityScene.draw();
 
     } else if (this.scene === 'charselect') {
       this.ctx.fillStyle = '#05081a';
