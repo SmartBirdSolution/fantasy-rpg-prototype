@@ -1280,6 +1280,10 @@ class DuelBattleScene {
     this.hoveredElixir  = null;
     this.floats         = [];
 
+    this._oppHotHps       = 0;
+    this._oppHotRemaining = 0;
+    this._oppHotAccum     = 0;
+
     this._countdown       = 90;
     this._countdownHandle = null;
     this.playerDefending  = false;
@@ -1303,7 +1307,14 @@ class DuelBattleScene {
 
     Network.onDuelAttack  = d => this._onAttackResult(d);
     Network.onDuelForfeit = d => this._onForfeit(d);
-    Network.onDuelHeal    = d => this.spawnHealFloat(d.total, 'opponent');
+    Network.onDuelHeal    = d => {
+      const info = d.total;
+      if (!info || typeof info !== 'object') return;
+      this._log(`Opponent used ${info.itemName}! (+${info.hotHps} HP/s for ${info.hotDuration}s)`, 'log-system');
+      this._oppHotHps       = info.hotHps;
+      this._oppHotRemaining = info.hotDuration;
+      this._oppHotAccum     = 0;
+    };
 
     if (this._firstTurn) {
       this._log('You go first — pick a zone!', 'log-system');
@@ -1546,6 +1557,18 @@ class DuelBattleScene {
   // ── UPDATE ─────────────────────────────────────────────────────────
   update(dt) {
     this._animTime += dt;
+
+    if (this._oppHotRemaining > 0) {
+      const tick = Math.min(this._oppHotRemaining, dt);
+      this._oppHotAccum    += tick * this._oppHotHps;
+      this._oppHotRemaining = Math.max(0, this._oppHotRemaining - dt);
+      if (this._oppHotAccum >= 1) {
+        const pts = Math.floor(this._oppHotAccum);
+        this._oppHotAccum -= pts;
+        this.opponentCurrentHP = Math.min(this.opponent.maxHP, this.opponentCurrentHP + pts);
+        this.spawnHealFloat(pts, 'opponent');
+      }
+    }
 
     if (this.animState === 'playerAtk' || this.animState === 'enemyAtk') {
       this.animT += dt * 2.8;
@@ -2414,7 +2437,7 @@ class DuelBattleScene {
     if (!item || slotIdx >= this.player.elixirSlotsAvailable) return;
     this.player.useElixirSlot(slotIdx);
     this._log(`You drink ${item.name}! +${item.hotHps} HP/s for ${item.hotDuration}s`, 'log-system');
-    if (Network.connected) Network.sendDuelHeal(this.sessionId, item.hotHps * item.hotDuration);
+    if (Network.connected) Network.sendDuelHeal(this.sessionId, { hotHps: item.hotHps, hotDuration: item.hotDuration, itemName: item.name });
   }
 
   _drawElixirBelt(ctx, W, H) {
