@@ -178,7 +178,7 @@ const EQUIPMENT_TEMPLATES = {
   // Armor
   LeatherHelm:   { slot: 'helmet',     name: 'Leather Helm',    defBonus: 2  },
   IronHelm:      { slot: 'helmet',     name: 'Iron Helm',       defBonus: 5  },
-  Chainmail:     { slot: 'body',       name: 'Chainmail',       defBonus: 5, hpBonus: 15 },
+  Chainmail:     { slot: 'chainmail',   name: 'Chainmail',       defBonus: 5, hpBonus: 15 },
   PlateArmor:    { slot: 'body',       name: 'Plate Armor',     defBonus: 9, hpBonus: 25 },
   LeatherBoots:  { slot: 'boots',      name: 'Leather Boots',   defBonus: 1  },
   IronBoots:     { slot: 'boots',      name: 'Iron Boots',      defBonus: 3  },

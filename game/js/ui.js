@@ -72,6 +72,7 @@ const UI = {
     this._duelStartTime   = 0;
     this._invPlayer       = null;
     this._adminPanelOpen  = false;
+    this._dragInvIdx      = null; // index of bag slot being dragged
 
     // Close inventory context menu when clicking anywhere in the popup
     document.getElementById('inventory-popup').addEventListener('click', e => {
@@ -349,9 +350,9 @@ const UI = {
     const player = this._invPlayer;
 
     // Equipment slots
-    const SLOTS = ['helmet','shoulders','body','belt','legs','boots','mainHand','offHand'];
-    const LABELS = { helmet:'Helmet', shoulders:'Shoulders', body:'Body', belt:'Belt',
-                     legs:'Legs', boots:'Boots', mainHand:'Main Hand', offHand:'Off Hand' };
+    const SLOTS = ['helmet','shoulders','chainmail','body','belt','legs','boots','mainHand','offHand'];
+    const LABELS = { helmet:'Helmet', shoulders:'Shoulders', chainmail:'Chainmail', body:'Body',
+                     belt:'Belt', legs:'Legs', boots:'Boots', mainHand:'Main Hand', offHand:'Off Hand' };
 
     const equipGrid = document.getElementById('inv-equip-grid');
     equipGrid.innerHTML = '';
@@ -367,6 +368,24 @@ const UI = {
           this._showEquipContext(slot, e.clientX, e.clientY);
         });
       }
+      // Drop target: accept any bag item whose slot matches this equipment slot
+      el.addEventListener('dragover', e => {
+        const dragged = this._dragInvIdx != null ? player.inventory[this._dragInvIdx] : null;
+        if (dragged && dragged.slot === slot) {
+          e.preventDefault();
+          el.classList.add('drag-over');
+        }
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        if (this._dragInvIdx != null) {
+          player.equipFromInventory(this._dragInvIdx);
+          this._dragInvIdx = null;
+          this._renderInventory();
+        }
+      });
       equipGrid.appendChild(el);
     }
 
@@ -405,13 +424,19 @@ const UI = {
         });
       }
       if (!locked) {
-        el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+        el.addEventListener('dragover', e => {
+          const dragged = this._dragInvIdx != null ? player.inventory[this._dragInvIdx] : null;
+          if (dragged && dragged.slot === 'consumable') { e.preventDefault(); el.classList.add('drag-over'); }
+        });
         el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
         el.addEventListener('drop', e => {
           e.preventDefault();
           el.classList.remove('drag-over');
-          const invIdx = parseInt(e.dataTransfer.getData('invIdx'), 10);
-          if (!isNaN(invIdx)) { player.equipElixirSlot(invIdx, i); this._renderInventory(); }
+          if (this._dragInvIdx != null) {
+            player.equipElixirSlot(this._dragInvIdx, i);
+            this._dragInvIdx = null;
+            this._renderInventory();
+          }
         });
       }
       elixirGrid.appendChild(el);
@@ -431,9 +456,10 @@ const UI = {
           e.stopPropagation();
           this._showItemContext(i, e.clientX, e.clientY);
         });
-        if (item.slot === 'consumable') {
+        if (item.slot !== 'gold') {
           el.draggable = true;
-          el.addEventListener('dragstart', e => { e.dataTransfer.setData('invIdx', i); });
+          el.addEventListener('dragstart', () => { this._dragInvIdx = i; });
+          el.addEventListener('dragend',   () => { this._dragInvIdx = null; });
         }
       }
       itemGrid.appendChild(el);

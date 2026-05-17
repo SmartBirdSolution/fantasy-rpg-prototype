@@ -12,15 +12,16 @@ class Character {
     this.accent    = accent;
     this.currentHP = baseHP;
     this.equipped  = {
-      helmet: null, shoulders: null, body: null, belt: null,
+      helmet: null, shoulders: null, chainmail: null, body: null, belt: null,
       legs: null, boots: null, mainHand: null, offHand: null,
     };
   }
 
   get maxHP() {
     return this.baseHP
-      + (this.equipped.body?.hpBonus ?? 0)
-      + (this.equipped.belt?.hpBonus ?? 0);
+      + (this.equipped.chainmail?.hpBonus ?? 0)
+      + (this.equipped.body?.hpBonus      ?? 0)
+      + (this.equipped.belt?.hpBonus      ?? 0);
   }
   get totalAtk() {
     return this.baseAtk
@@ -31,6 +32,7 @@ class Character {
     return this.baseDef
       + (this.equipped.helmet?.defBonus    ?? 0)
       + (this.equipped.shoulders?.defBonus ?? 0)
+      + (this.equipped.chainmail?.defBonus ?? 0)
       + (this.equipped.body?.defBonus      ?? 0)
       + (this.equipped.belt?.defBonus      ?? 0)
       + (this.equipped.legs?.defBonus      ?? 0)
