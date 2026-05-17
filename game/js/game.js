@@ -170,7 +170,7 @@ class Game {
 
   _onDuelStart(data) {
     UI.hideDuelPopup();
-    if (this.scene !== 'world') return;
+    if (this.scene !== 'world' && this.scene !== 'city') return;
 
     this.scene         = 'transitioning';
     this.duelSessionId = data.sessionId;
