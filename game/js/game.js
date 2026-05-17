@@ -155,7 +155,7 @@ class Game {
 
   // ── DUEL QUEUE ───────────────────────────────────────────────────────
   _enterDuelQueue() {
-    if (this.scene !== 'world' || !Network.connected) return;
+    if (this.scene !== 'city' || !Network.connected) return;
     Network.sendDuelQueue({
       name:  this.player.name,
       race:  this.player.race,
