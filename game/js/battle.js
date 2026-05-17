@@ -411,15 +411,30 @@ class BattleScene {
       ctx.beginPath(); ctx.arc(cx, cy, OR + 30, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Base crimson body (full donut)
+    // ── Shield face (full donut OR → IR, dark aged iron) ─────────────
     ctx.beginPath();
     ctx.arc(cx, cy, OR, 0, Math.PI * 2, false);
     ctx.arc(cx, cy, IR, 0, Math.PI * 2, true);
-    const bgGrad = ctx.createRadialGradient(cx - 12, cy - 12, 4, cx, cy, OR);
-    bgGrad.addColorStop(0, '#3e0808');
-    bgGrad.addColorStop(0.65, '#270505');
-    bgGrad.addColorStop(1, '#170303');
+    ctx.closePath();
+    const bgGrad = ctx.createRadialGradient(cx - 14, cy - 14, 4, cx, cy, OR);
+    bgGrad.addColorStop(0,    '#2e1a08');
+    bgGrad.addColorStop(0.42, '#1e1005');
+    bgGrad.addColorStop(0.78, '#120a03');
+    bgGrad.addColorStop(1,    '#0a0601');
     ctx.fillStyle = bgGrad; ctx.fill();
+
+    // ── Inner boss ring (IR → IR+7, raised steel) ────────────────────
+    ctx.beginPath();
+    ctx.arc(cx, cy, IR + 7, 0, Math.PI * 2, false);
+    ctx.arc(cx, cy, IR, 0, Math.PI * 2, true);
+    ctx.closePath();
+    const bossRG = ctx.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, IR + 9);
+    bossRG.addColorStop(0, '#9aa8b8'); bossRG.addColorStop(0.5, '#5e6c7e'); bossRG.addColorStop(1, '#2e3848');
+    ctx.fillStyle = bossRG; ctx.fill();
+    ctx.strokeStyle = 'rgba(200,218,240,0.50)'; ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 6.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.52)'; ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 0.5, 0, Math.PI * 2); ctx.stroke();
 
     // Segment highlight overlays
     const segs = [
@@ -452,51 +467,92 @@ class BattleScene {
       ctx.restore();
     }
 
-    // Gold filigree: inner/outer rings + tick marks
-    ctx.save(); ctx.globalAlpha = 0.32; ctx.strokeStyle = '#b89010'; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.arc(cx, cy, OR - 8, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, IR + 6, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 0.20; ctx.lineWidth = 0.6;
-    for (let a = 0; a < 360; a += 15) {
-      const r = a * DEG, len = (a % 45 === 0) ? 9 : 4, r1 = OR - 8;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(r) * r1, cy + Math.sin(r) * r1);
-      ctx.lineTo(cx + Math.cos(r) * (r1 - len), cy + Math.sin(r) * (r1 - len));
-      ctx.stroke();
+    // ── Outer shield rim (OR-9 → OR, riveted steel band) ────────────
+    ctx.beginPath();
+    ctx.arc(cx, cy, OR, 0, Math.PI * 2, false);
+    ctx.arc(cx, cy, OR - 9, 0, Math.PI * 2, true);
+    ctx.closePath();
+    const rimFG = ctx.createRadialGradient(cx - 10, cy - 10, OR - 18, cx, cy, OR + 3);
+    rimFG.addColorStop(0,    '#b8c2d2');
+    rimFG.addColorStop(0.28, '#dce4f4');
+    rimFG.addColorStop(0.55, '#9aa4b8');
+    rimFG.addColorStop(0.82, '#686e7e');
+    rimFG.addColorStop(1,    '#363c4a');
+    ctx.fillStyle = rimFG; ctx.fill();
+    // Rim highlight outer edge + inner shadow
+    ctx.shadowColor = 'rgba(220,232,255,0.38)'; ctx.shadowBlur = 4;
+    ctx.strokeStyle = 'rgba(225,232,252,0.62)'; ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 1, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 8.5, 0, Math.PI * 2); ctx.stroke();
+    // 18 steel rivets
+    for (let i = 0; i < 18; i++) {
+      const ra = (i / 18) * Math.PI * 2;
+      const rx = cx + Math.cos(ra) * (OR - 4.5);
+      const ry = cy + Math.sin(ra) * (OR - 4.5);
+      const rg = ctx.createRadialGradient(rx - 0.7, ry - 0.7, 0.2, rx, ry, 2.6);
+      rg.addColorStop(0, '#eef2ff'); rg.addColorStop(0.32, '#a8b2c6'); rg.addColorStop(1, '#404858');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(rx, ry, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.40)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.arc(rx, ry, 2.6, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // Concentric ring engravings on shield face
+    ctx.save();
+    for (const [r, a, w] of [[OR - 15, 0.20, 0.9], [OR - 22, 0.14, 0.6], [IR + 14, 0.14, 0.6], [IR + 9, 0.11, 0.45]]) {
+      ctx.strokeStyle = `rgba(200,160,50,${a})`; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
 
-    // Gold hard rings
-    ctx.shadowColor = 'rgba(200,150,28,0.45)'; ctx.shadowBlur = 6;
-    ctx.strokeStyle = '#d4a030'; ctx.lineWidth = 3.5;
+    // Gold accent rings (outer edge + inner boss)
+    ctx.shadowColor = `rgba(200,150,28,${0.42 + pulse * 0.18})`; ctx.shadowBlur = 7;
+    ctx.strokeStyle = '#c8a030'; ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.arc(cx, cy, OR, 0, Math.PI * 2); ctx.stroke();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(cx, cy, OR - 6, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#c8a030'; ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(180,140,40,${0.40 + pulse * 0.15})`; ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.arc(cx, cy, IR, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(cx, cy, IR + 5, 0, Math.PI * 2); ctx.stroke();
 
     // 4 ornate divider swords at gap midpoints
     for (const a of [270, 330, 30, 90, 150, 210]) this._drawDividerSword(ctx, cx, cy, a, OR, pulse);
+
+    // Smooth sword offset — lerp toward target each frame
+    if (!this._swordOffsets) this._swordOffsets = { top: 0, mid: 0, bot: 0 };
+
+    // Shield one-shot shake — triggers on hover entry, decays to zero
+    if (this._shieldShakeStart === undefined) this._shieldShakeStart = null;
+    const isHovDef = hov === 'defend' && this.defenseEnabled;
+    if (isHovDef && this._shieldShakeStart === null) this._shieldShakeStart = this._animTime;
+    if (!isHovDef) this._shieldShakeStart = null;
+    const _sst = this._shieldShakeStart;
+    const shieldShake = (_sst !== null)
+      ? Math.sin((this._animTime - _sst) * 22) * 0.11 * Math.max(0, 1 - (this._animTime - _sst) * 2.2)
+      : 0;
 
     // Segment icons (drawn on top of base, under medallion)
     const iconR = (OR + IR) / 2;
     for (const seg of segs) {
       const isHov = hov === seg.id && seg.enabled;
       const isAct = seg.id === 'defend' && def;
-      const ix = cx + Math.cos(seg.midA * DEG) * iconR;
-      const iy = cy + Math.sin(seg.midA * DEG) * iconR;
+      let hoverPush = 0;
+      if (seg.id !== 'defend') {
+        const target = isHov ? 14 : 0;
+        this._swordOffsets[seg.id] += (target - this._swordOffsets[seg.id]) * 0.12;
+        hoverPush = this._swordOffsets[seg.id];
+      }
+      const ix = cx + Math.cos(seg.midA * DEG) * (iconR + hoverPush);
+      const iy = cy + Math.sin(seg.midA * DEG) * (iconR + hoverPush);
       if (seg.id === 'defend') {
-        this._drawShieldIcon(ctx, ix, iy, isHov, isAct, seg.enabled);
+        this._drawShieldIcon(ctx, ix, iy, isHov, isAct, seg.enabled, shieldShake);
       } else {
         const lbl = { top: 'HEAD', mid: 'BODY', bot: 'LEGS' }[seg.id];
-        this._drawSwordIcon(ctx, ix, iy, lbl, isHov, seg.enabled, seg.midA);
+        this._drawSwordIcon(ctx, ix, iy, lbl, isHov, seg.enabled, seg.midA, pulse);
       }
     }
 
-    this._drawCenterMedallion(ctx, cx, cy, def, pulse);
+    this._drawCenterMedallion(ctx, cx, cy, def, pulse, this._animTime);
   }
 
   _drawDividerSword(ctx, cx, cy, angleDeg, OR, pulse) {
@@ -531,7 +587,7 @@ class BattleScene {
     ctx.restore();
   }
 
-  _drawCenterMedallion(ctx, cx, cy, defending, pulse) {
+  _drawCenterMedallion(ctx, cx, cy, defending, pulse, animTime = 0) {
     const R = 36;
 
     // Base
@@ -540,6 +596,25 @@ class BattleScene {
     bGrad.addColorStop(0, defending ? '#1e3acc' : '#0e1a72');
     bGrad.addColorStop(1, defending ? '#0a1a88' : '#060d42');
     ctx.fillStyle = bGrad; ctx.fill();
+
+    // Organic inner light — four incommensurate frequencies, blooms irregularly
+    const t  = animTime;
+    const lp = 0.50 + 0.22 * Math.sin(t * 1.7)
+                    + 0.16 * Math.sin(t * 2.9 + 1.8)
+                    + 0.09 * Math.sin(t * 5.1 + 0.6)
+                    + 0.05 * Math.sin(t * 8.3 + 2.1);
+    const lR = Math.max(1, 6 + lp * 10);
+    const lA = defending ? 0.36 + lp * 0.40 : 0.05 + lp * 0.22;
+    const lG = ctx.createRadialGradient(cx - 1, cy - 1, 0.5, cx, cy, lR);
+    lG.addColorStop(0,    `rgba(180,228,255,${Math.min(1, lA + 0.22)})`);
+    lG.addColorStop(0.42, `rgba(90,170,255,${Math.max(0, lA)})`);
+    lG.addColorStop(1,    'rgba(40,80,220,0)');
+    ctx.fillStyle = lG;
+    ctx.beginPath(); ctx.arc(cx, cy, lR, 0, Math.PI * 2); ctx.fill();
+    // Spark — brightens when light blooms, dims when it fades
+    const sA = Math.max(0, lp * 0.82);
+    ctx.fillStyle = `rgba(215,242,255,${Math.min(1, sA)})`;
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0.5, 1.2 + lp * 2.2), 0, Math.PI * 2); ctx.fill();
 
     // Defend inner pulse
     if (defending) {
@@ -672,9 +747,10 @@ class BattleScene {
     }
   }
 
-  _drawShieldIcon(ctx, x, y, hover, active, enabled) {
+  _drawShieldIcon(ctx, x, y, hover, active, enabled, shakeAngle = 0) {
     ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
     ctx.translate(x, y);
+    if (shakeAngle) ctx.rotate(shakeAngle);
 
     const HW = 11;   // half-width at top
     const TY = -11;  // top y
@@ -781,7 +857,7 @@ class BattleScene {
     ctx.textBaseline = 'alphabetic'; ctx.restore();
   }
 
-  _drawSwordIcon(ctx, x, y, label, hover, enabled, midAngleDeg) {
+  _drawSwordIcon(ctx, x, y, label, hover, enabled, midAngleDeg, pulse = 0.5) {
     const DEG = Math.PI / 180;
     ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
     ctx.translate(x, y);
@@ -1442,15 +1518,30 @@ class DuelBattleScene {
       ctx.beginPath(); ctx.arc(cx, cy, OR + 30, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Base crimson body (full donut)
+    // ── Shield face (full donut OR → IR, dark aged iron) ─────────────
     ctx.beginPath();
     ctx.arc(cx, cy, OR, 0, Math.PI * 2, false);
     ctx.arc(cx, cy, IR, 0, Math.PI * 2, true);
-    const bgGrad = ctx.createRadialGradient(cx - 12, cy - 12, 4, cx, cy, OR);
-    bgGrad.addColorStop(0, '#3e0808');
-    bgGrad.addColorStop(0.65, '#270505');
-    bgGrad.addColorStop(1, '#170303');
+    ctx.closePath();
+    const bgGrad = ctx.createRadialGradient(cx - 14, cy - 14, 4, cx, cy, OR);
+    bgGrad.addColorStop(0,    '#2e1a08');
+    bgGrad.addColorStop(0.42, '#1e1005');
+    bgGrad.addColorStop(0.78, '#120a03');
+    bgGrad.addColorStop(1,    '#0a0601');
     ctx.fillStyle = bgGrad; ctx.fill();
+
+    // ── Inner boss ring (IR → IR+7, raised steel) ────────────────────
+    ctx.beginPath();
+    ctx.arc(cx, cy, IR + 7, 0, Math.PI * 2, false);
+    ctx.arc(cx, cy, IR, 0, Math.PI * 2, true);
+    ctx.closePath();
+    const bossRG = ctx.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, IR + 9);
+    bossRG.addColorStop(0, '#9aa8b8'); bossRG.addColorStop(0.5, '#5e6c7e'); bossRG.addColorStop(1, '#2e3848');
+    ctx.fillStyle = bossRG; ctx.fill();
+    ctx.strokeStyle = 'rgba(200,218,240,0.50)'; ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 6.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.52)'; ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.arc(cx, cy, IR + 0.5, 0, Math.PI * 2); ctx.stroke();
 
     // Segment highlight overlays
     const segs = [
@@ -1483,51 +1574,92 @@ class DuelBattleScene {
       ctx.restore();
     }
 
-    // Gold filigree: inner/outer rings + tick marks
-    ctx.save(); ctx.globalAlpha = 0.32; ctx.strokeStyle = '#b89010'; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.arc(cx, cy, OR - 8, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, IR + 6, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 0.20; ctx.lineWidth = 0.6;
-    for (let a = 0; a < 360; a += 15) {
-      const r = a * DEG, len = (a % 45 === 0) ? 9 : 4, r1 = OR - 8;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(r) * r1, cy + Math.sin(r) * r1);
-      ctx.lineTo(cx + Math.cos(r) * (r1 - len), cy + Math.sin(r) * (r1 - len));
-      ctx.stroke();
+    // ── Outer shield rim (OR-9 → OR, riveted steel band) ────────────
+    ctx.beginPath();
+    ctx.arc(cx, cy, OR, 0, Math.PI * 2, false);
+    ctx.arc(cx, cy, OR - 9, 0, Math.PI * 2, true);
+    ctx.closePath();
+    const rimFG = ctx.createRadialGradient(cx - 10, cy - 10, OR - 18, cx, cy, OR + 3);
+    rimFG.addColorStop(0,    '#b8c2d2');
+    rimFG.addColorStop(0.28, '#dce4f4');
+    rimFG.addColorStop(0.55, '#9aa4b8');
+    rimFG.addColorStop(0.82, '#686e7e');
+    rimFG.addColorStop(1,    '#363c4a');
+    ctx.fillStyle = rimFG; ctx.fill();
+    // Rim highlight outer edge + inner shadow
+    ctx.shadowColor = 'rgba(220,232,255,0.38)'; ctx.shadowBlur = 4;
+    ctx.strokeStyle = 'rgba(225,232,252,0.62)'; ctx.lineWidth = 1.0;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 1, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, OR - 8.5, 0, Math.PI * 2); ctx.stroke();
+    // 18 steel rivets
+    for (let i = 0; i < 18; i++) {
+      const ra = (i / 18) * Math.PI * 2;
+      const rx = cx + Math.cos(ra) * (OR - 4.5);
+      const ry = cy + Math.sin(ra) * (OR - 4.5);
+      const rg = ctx.createRadialGradient(rx - 0.7, ry - 0.7, 0.2, rx, ry, 2.6);
+      rg.addColorStop(0, '#eef2ff'); rg.addColorStop(0.32, '#a8b2c6'); rg.addColorStop(1, '#404858');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(rx, ry, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.40)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.arc(rx, ry, 2.6, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // Concentric ring engravings on shield face
+    ctx.save();
+    for (const [r, a, w] of [[OR - 15, 0.20, 0.9], [OR - 22, 0.14, 0.6], [IR + 14, 0.14, 0.6], [IR + 9, 0.11, 0.45]]) {
+      ctx.strokeStyle = `rgba(200,160,50,${a})`; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
 
-    // Gold hard rings
-    ctx.shadowColor = 'rgba(200,150,28,0.45)'; ctx.shadowBlur = 6;
-    ctx.strokeStyle = '#d4a030'; ctx.lineWidth = 3.5;
+    // Gold accent rings (outer edge + inner boss)
+    ctx.shadowColor = `rgba(200,150,28,${0.42 + pulse * 0.18})`; ctx.shadowBlur = 7;
+    ctx.strokeStyle = '#c8a030'; ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.arc(cx, cy, OR, 0, Math.PI * 2); ctx.stroke();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(cx, cy, OR - 6, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#c8a030'; ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(180,140,40,${0.40 + pulse * 0.15})`; ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.arc(cx, cy, IR, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#906a14'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(cx, cy, IR + 5, 0, Math.PI * 2); ctx.stroke();
 
     // 4 ornate divider swords at gap midpoints
     for (const a of [270, 330, 30, 90, 150, 210]) this._drawDividerSword(ctx, cx, cy, a, OR, pulse);
+
+    // Smooth sword offset — lerp toward target each frame
+    if (!this._swordOffsets) this._swordOffsets = { top: 0, mid: 0, bot: 0 };
+
+    // Shield one-shot shake — triggers on hover entry, decays to zero
+    if (this._shieldShakeStart === undefined) this._shieldShakeStart = null;
+    const isHovDef = hov === 'defend' && this.defenseEnabled;
+    if (isHovDef && this._shieldShakeStart === null) this._shieldShakeStart = this._animTime;
+    if (!isHovDef) this._shieldShakeStart = null;
+    const _sst = this._shieldShakeStart;
+    const shieldShake = (_sst !== null)
+      ? Math.sin((this._animTime - _sst) * 22) * 0.11 * Math.max(0, 1 - (this._animTime - _sst) * 2.2)
+      : 0;
 
     // Segment icons (drawn on top of base, under medallion)
     const iconR = (OR + IR) / 2;
     for (const seg of segs) {
       const isHov = hov === seg.id && seg.enabled;
       const isAct = seg.id === 'defend' && def;
-      const ix = cx + Math.cos(seg.midA * DEG) * iconR;
-      const iy = cy + Math.sin(seg.midA * DEG) * iconR;
+      let hoverPush = 0;
+      if (seg.id !== 'defend') {
+        const target = isHov ? 14 : 0;
+        this._swordOffsets[seg.id] += (target - this._swordOffsets[seg.id]) * 0.12;
+        hoverPush = this._swordOffsets[seg.id];
+      }
+      const ix = cx + Math.cos(seg.midA * DEG) * (iconR + hoverPush);
+      const iy = cy + Math.sin(seg.midA * DEG) * (iconR + hoverPush);
       if (seg.id === 'defend') {
-        this._drawShieldIcon(ctx, ix, iy, isHov, isAct, seg.enabled);
+        this._drawShieldIcon(ctx, ix, iy, isHov, isAct, seg.enabled, shieldShake);
       } else {
         const lbl = { top: 'HEAD', mid: 'BODY', bot: 'LEGS' }[seg.id];
-        this._drawSwordIcon(ctx, ix, iy, lbl, isHov, seg.enabled, seg.midA);
+        this._drawSwordIcon(ctx, ix, iy, lbl, isHov, seg.enabled, seg.midA, pulse);
       }
     }
 
-    this._drawCenterMedallion(ctx, cx, cy, def, pulse);
+    this._drawCenterMedallion(ctx, cx, cy, def, pulse, this._animTime);
   }
 
   _drawDividerSword(ctx, cx, cy, angleDeg, OR, pulse) {
@@ -1562,7 +1694,7 @@ class DuelBattleScene {
     ctx.restore();
   }
 
-  _drawCenterMedallion(ctx, cx, cy, defending, pulse) {
+  _drawCenterMedallion(ctx, cx, cy, defending, pulse, animTime = 0) {
     const R = 36;
 
     // Base
@@ -1571,6 +1703,25 @@ class DuelBattleScene {
     bGrad.addColorStop(0, defending ? '#1e3acc' : '#0e1a72');
     bGrad.addColorStop(1, defending ? '#0a1a88' : '#060d42');
     ctx.fillStyle = bGrad; ctx.fill();
+
+    // Organic inner light — four incommensurate frequencies, blooms irregularly
+    const t  = animTime;
+    const lp = 0.50 + 0.22 * Math.sin(t * 1.7)
+                    + 0.16 * Math.sin(t * 2.9 + 1.8)
+                    + 0.09 * Math.sin(t * 5.1 + 0.6)
+                    + 0.05 * Math.sin(t * 8.3 + 2.1);
+    const lR = Math.max(1, 6 + lp * 10);
+    const lA = defending ? 0.36 + lp * 0.40 : 0.05 + lp * 0.22;
+    const lG = ctx.createRadialGradient(cx - 1, cy - 1, 0.5, cx, cy, lR);
+    lG.addColorStop(0,    `rgba(180,228,255,${Math.min(1, lA + 0.22)})`);
+    lG.addColorStop(0.42, `rgba(90,170,255,${Math.max(0, lA)})`);
+    lG.addColorStop(1,    'rgba(40,80,220,0)');
+    ctx.fillStyle = lG;
+    ctx.beginPath(); ctx.arc(cx, cy, lR, 0, Math.PI * 2); ctx.fill();
+    // Spark — brightens when light blooms, dims when it fades
+    const sA = Math.max(0, lp * 0.82);
+    ctx.fillStyle = `rgba(215,242,255,${Math.min(1, sA)})`;
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0.5, 1.2 + lp * 2.2), 0, Math.PI * 2); ctx.fill();
 
     // Defend inner pulse
     if (defending) {
@@ -1703,9 +1854,10 @@ class DuelBattleScene {
     }
   }
 
-  _drawShieldIcon(ctx, x, y, hover, active, enabled) {
+  _drawShieldIcon(ctx, x, y, hover, active, enabled, shakeAngle = 0) {
     ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
     ctx.translate(x, y);
+    if (shakeAngle) ctx.rotate(shakeAngle);
 
     const HW = 11;   // half-width at top
     const TY = -11;  // top y
@@ -1812,7 +1964,7 @@ class DuelBattleScene {
     ctx.textBaseline = 'alphabetic'; ctx.restore();
   }
 
-  _drawSwordIcon(ctx, x, y, label, hover, enabled, midAngleDeg) {
+  _drawSwordIcon(ctx, x, y, label, hover, enabled, midAngleDeg, pulse = 0.5) {
     const DEG = Math.PI / 180;
     ctx.save(); ctx.globalAlpha = enabled ? 1 : 0.22;
     ctx.translate(x, y);
