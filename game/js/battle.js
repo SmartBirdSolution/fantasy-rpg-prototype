@@ -1424,7 +1424,7 @@ class DuelBattleScene {
     ctx.save();
     ctx.translate(W * 0.75 + eLunge, H * 0.68);
     ctx.scale(-2, 2);
-    CharacterDrawer.drawHumanoid(ctx, 0, 0, this._oppColor, this._oppAccent, true, 0, this.opponent.race);
+    CharacterDrawer.drawHumanoid(ctx, 0, 0, this._oppColor, this._oppAccent, true, 0);
     ctx.restore();
 
     this._drawZoneLines(ctx, W, H);

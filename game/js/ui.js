@@ -352,7 +352,7 @@ const UI = {
     ctx.save();
     ctx.translate(60, 145);
     ctx.scale(1.8, 1.8);
-    CharacterDrawer.drawHumanoid(ctx, 0, 0, player.color, player.accent, true, 0, player.race);
+    CharacterDrawer.drawHumanoid(ctx, 0, 0, player.color, player.accent, true, 0);
     ctx.restore();
 
     // Stats text

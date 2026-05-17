@@ -519,7 +519,7 @@ class WorldScene {
       const inBattle = p.scene === 'battle';
       if (inBattle) ctx.globalAlpha = 0.6;
 
-      CharacterDrawer.drawWorldPlayer(ctx, p.x, p.y + 6, color, accent, p.race);
+      CharacterDrawer.drawWorldPlayer(ctx, p.x, p.y + 6, color, accent);
       ctx.globalAlpha = 1;
 
       // Name tag (different colour from local player)
@@ -545,8 +545,7 @@ class WorldScene {
       this.px,
       this.py + 6,
       this.player.color,
-      this.player.accent,
-      this.player.race
+      this.player.accent
     );
 
     this.ctx.fillStyle = 'rgba(0,0,0,0.55)';

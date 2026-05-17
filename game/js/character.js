@@ -167,7 +167,7 @@ class PlayerCharacter extends Character {
   }
 
   draw(ctx, cx, cy, facingRight = true, lungeOffset = 0) {
-    CharacterDrawer.drawHumanoid(ctx, cx, cy, this.color, this.accent, facingRight, lungeOffset, this.race);
+    CharacterDrawer.drawHumanoid(ctx, cx, cy, this.color, this.accent, facingRight, lungeOffset);
   }
 }
 
@@ -202,7 +202,7 @@ class EnemyCharacter extends Character {
 // ── CHARACTER DRAWER ────────────────────────────────────────────────
 class CharacterDrawer {
 
-  static drawHumanoid(ctx, cx, cy, color, accent, facingRight, lunge = 0, race = null) {
+  static drawHumanoid(ctx, cx, cy, color, accent, facingRight, lunge = 0) {
     ctx.save();
     const dir = facingRight ? 1 : -1;
     const x = cx + dir * lunge;
@@ -210,12 +210,6 @@ class CharacterDrawer {
     if (!facingRight) {
       ctx.translate(cx * 2, 0);
       ctx.scale(-1, 1);
-    }
-
-    if (race === 'Human') {
-      CharacterDrawer._human(ctx, x, cy);
-      ctx.restore();
-      return;
     }
 
     // Shadow
@@ -250,236 +244,6 @@ class CharacterDrawer {
     ctx.fillRect(x + 2, cy - 37, 3, 3);
 
     ctx.restore();
-  }
-
-  static _human(ctx, x, y) {
-    const skin     = '#d4a878';
-    const skinDk   = '#a8784a';
-    const tunic    = '#e8dfc0';
-    const tunicSh  = '#c8bfa0';
-    const leather  = '#7a5030';
-    const leatherDk= '#4a2e18';
-    const leatherLt= '#a07848';
-    const pants    = '#3a2818';
-    const hair     = '#b89048';
-    const hairDk   = '#7a5820';
-    const metal    = '#8898a8';
-    const metalLt  = '#c8d8e8';
-    const gold     = '#c8a028';
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    ctx.beginPath(); ctx.ellipse(x, y + 2, 14, 5, 0, 0, Math.PI * 2); ctx.fill();
-
-    // ── BOOTS ──
-    ctx.fillStyle = leatherDk;
-    ctx.beginPath(); ctx.roundRect(x - 8, y - 14, 7, 16, [0,0,2,2]); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(x + 1, y - 14, 7, 16, [0,0,2,2]); ctx.fill();
-    // boot highlight strip
-    ctx.fillStyle = leather;
-    ctx.fillRect(x - 7, y - 13, 2, 10);
-    ctx.fillRect(x + 2, y - 13, 2, 10);
-
-    // ── SHIN ARMOR PLATES ──
-    ctx.fillStyle = metal;
-    ctx.beginPath(); ctx.roundRect(x - 8, y - 24, 7, 12, 1); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(x + 1, y - 24, 7, 12, 1); ctx.fill();
-    ctx.fillStyle = metalLt;
-    ctx.fillRect(x - 7, y - 23, 2, 8);
-    ctx.fillRect(x + 2, y - 23, 2, 8);
-    ctx.strokeStyle = '#607080'; ctx.lineWidth = 0.6;
-    ctx.strokeRect(x - 8, y - 24, 7, 12);
-    ctx.strokeRect(x + 1, y - 24, 7, 12);
-    // plate rivets
-    ctx.fillStyle = metalLt;
-    ctx.beginPath(); ctx.arc(x - 5, y - 23, 1, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x + 4, y - 23, 1, 0, Math.PI * 2); ctx.fill();
-
-    // ── UPPER LEGS / PANTS ──
-    ctx.fillStyle = pants;
-    ctx.fillRect(x - 7, y - 32, 6, 10);
-    ctx.fillRect(x + 1, y - 32, 6, 10);
-    // inner leg shadow
-    ctx.fillStyle = '#281808';
-    ctx.fillRect(x - 2, y - 32, 4, 10);
-
-    // ── KILT PANELS ──
-    ctx.fillStyle = leather;
-    // center panel
-    ctx.beginPath();
-    ctx.moveTo(x - 5, y - 36); ctx.lineTo(x + 5, y - 36);
-    ctx.lineTo(x + 4, y - 26); ctx.lineTo(x - 4, y - 26);
-    ctx.closePath(); ctx.fill();
-    // left panel
-    ctx.beginPath();
-    ctx.moveTo(x - 9, y - 36); ctx.lineTo(x - 4, y - 36);
-    ctx.lineTo(x - 5, y - 26); ctx.lineTo(x - 10, y - 27);
-    ctx.closePath(); ctx.fill();
-    // right panel
-    ctx.beginPath();
-    ctx.moveTo(x + 4, y - 36); ctx.lineTo(x + 9, y - 36);
-    ctx.lineTo(x + 10, y - 27); ctx.lineTo(x + 5, y - 26);
-    ctx.closePath(); ctx.fill();
-    // panel separators
-    ctx.strokeStyle = leatherDk; ctx.lineWidth = 0.7;
-    ctx.beginPath(); ctx.moveTo(x - 4, y - 36); ctx.lineTo(x - 5, y - 26); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x + 4, y - 36); ctx.lineTo(x + 5, y - 26); ctx.stroke();
-    // kilt highlights
-    ctx.fillStyle = leatherLt;
-    ctx.fillRect(x - 4, y - 36, 2, 8);
-    ctx.fillRect(x + 3, y - 36, 2, 8);
-
-    // ── BELT ──
-    ctx.fillStyle = leatherDk;
-    ctx.fillRect(x - 10, y - 38, 20, 4);
-    ctx.fillStyle = gold;
-    ctx.fillRect(x - 3, y - 38, 6, 4);
-    ctx.strokeStyle = '#a08018'; ctx.lineWidth = 0.5;
-    ctx.strokeRect(x - 3, y - 38, 6, 4);
-    ctx.fillStyle = leatherLt;
-    ctx.fillRect(x - 10, y - 38, 20, 1);
-
-    // ── TORSO — sleeveless tunic ──
-    ctx.fillStyle = tunic;
-    ctx.beginPath(); ctx.roundRect(x - 8, y - 54, 16, 18, 2); ctx.fill();
-    // side shadow seams
-    ctx.fillStyle = tunicSh;
-    ctx.fillRect(x - 8, y - 54, 2, 18);
-    ctx.fillRect(x + 6, y - 54, 2, 18);
-    // center crease
-    ctx.strokeStyle = tunicSh; ctx.lineWidth = 0.6;
-    ctx.beginPath(); ctx.moveTo(x, y - 54); ctx.lineTo(x, y - 39); ctx.stroke();
-    // V neckline
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.moveTo(x - 3, y - 54); ctx.lineTo(x, y - 49); ctx.lineTo(x + 3, y - 54);
-    ctx.closePath(); ctx.fill();
-
-    // ── CHEST HARNESS ──
-    ctx.strokeStyle = leather; ctx.lineWidth = 2; ctx.lineCap = 'round';
-    // diagonal strap
-    ctx.beginPath(); ctx.moveTo(x + 6, y - 54); ctx.lineTo(x - 5, y - 39); ctx.stroke();
-    // horizontal band
-    ctx.beginPath(); ctx.moveTo(x - 8, y - 47); ctx.lineTo(x + 8, y - 47); ctx.stroke();
-    // buckle
-    ctx.fillStyle = gold;
-    ctx.beginPath(); ctx.arc(x + 1, y - 47, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#8a6010'; ctx.lineWidth = 0.7;
-    ctx.beginPath(); ctx.arc(x + 1, y - 47, 2, 0, Math.PI * 2); ctx.stroke();
-    ctx.lineCap = 'butt';
-
-    // ── RIGHT ARM (screen-left, character's right) ──
-    // upper arm bare skin
-    ctx.fillStyle = skin;
-    ctx.fillRect(x - 13, y - 54, 5, 12);
-    // muscle highlight
-    ctx.fillStyle = skinDk;
-    ctx.fillRect(x - 13, y - 46, 5, 4);
-    // forearm
-    ctx.fillStyle = skin;
-    ctx.fillRect(x - 13, y - 42, 5, 9);
-    // gauntlet
-    ctx.fillStyle = leatherDk;
-    ctx.beginPath(); ctx.roundRect(x - 14, y - 35, 7, 9, 1); ctx.fill();
-    ctx.fillStyle = leatherLt;
-    ctx.fillRect(x - 13, y - 34, 2, 6);
-    // knuckle lines
-    ctx.strokeStyle = leatherDk; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(x - 14, y - 31); ctx.lineTo(x - 7, y - 31); ctx.stroke();
-
-    // ── LEFT ARM (screen-right, character's left) ──
-    ctx.fillStyle = skin;
-    ctx.fillRect(x + 8, y - 54, 5, 12);
-    ctx.fillStyle = skinDk;
-    ctx.fillRect(x + 8, y - 46, 5, 4);
-    ctx.fillStyle = skin;
-    ctx.fillRect(x + 8, y - 42, 5, 9);
-    // armband on left arm
-    ctx.fillStyle = leather;
-    ctx.beginPath(); ctx.roundRect(x + 7, y - 47, 7, 5, 1); ctx.fill();
-    ctx.strokeStyle = leatherDk; ctx.lineWidth = 0.5;
-    ctx.strokeRect(x + 7, y - 47, 7, 5);
-    ctx.fillStyle = leatherLt;
-    ctx.fillRect(x + 8, y - 47, 2, 3);
-    // gauntlet
-    ctx.fillStyle = leatherDk;
-    ctx.beginPath(); ctx.roundRect(x + 7, y - 35, 7, 9, 1); ctx.fill();
-    ctx.fillStyle = leatherLt;
-    ctx.fillRect(x + 8, y - 34, 2, 6);
-    ctx.strokeStyle = leatherDk; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(x + 7, y - 31); ctx.lineTo(x + 14, y - 31); ctx.stroke();
-
-    // ── SHOULDER LEATHER PAD (left shoulder) ──
-    ctx.fillStyle = leather;
-    ctx.beginPath(); ctx.ellipse(x + 11, y - 53, 5, 3, -0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = leatherLt;
-    ctx.beginPath(); ctx.ellipse(x + 10, y - 54, 3, 1.5, -0.3, 0, Math.PI); ctx.fill();
-
-    // ── NECK ──
-    ctx.fillStyle = skin;
-    ctx.fillRect(x - 3, y - 58, 6, 6);
-    // neck shadow
-    ctx.fillStyle = skinDk;
-    ctx.fillRect(x - 3, y - 56, 1, 4);
-    ctx.fillRect(x + 2, y - 56, 1, 4);
-
-    // ── HEAD ──
-    // main head oval
-    ctx.fillStyle = skin;
-    ctx.beginPath(); ctx.ellipse(x, y - 65, 9, 10, 0, 0, Math.PI * 2); ctx.fill();
-    // jaw squaring
-    ctx.fillRect(x - 7, y - 64, 14, 7);
-    // chin
-    ctx.beginPath(); ctx.ellipse(x, y - 58, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
-
-    // ── HAIR ──
-    ctx.fillStyle = hair;
-    // crown
-    ctx.beginPath(); ctx.ellipse(x, y - 73, 9, 6, 0, Math.PI, 0); ctx.fill();
-    // sides
-    ctx.beginPath(); ctx.ellipse(x + 7, y - 68, 4, 5, 0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x - 7, y - 68, 4, 5, -0.3, 0, Math.PI * 2); ctx.fill();
-    // hair depth
-    ctx.fillStyle = hairDk;
-    ctx.beginPath(); ctx.ellipse(x, y - 73, 6, 3.5, 0, Math.PI, 0); ctx.fill();
-    // front tuft
-    ctx.fillStyle = hair;
-    ctx.beginPath(); ctx.ellipse(x - 1, y - 74, 6, 3, -0.15, Math.PI, 0); ctx.fill();
-
-    // ── BROW / FACE ──
-    // brow ridge shadow
-    ctx.fillStyle = skinDk;
-    ctx.fillRect(x - 6, y - 70, 5, 1.5);
-    ctx.fillRect(x + 1, y - 70, 5, 1.5);
-
-    // eyes
-    ctx.fillStyle = '#1a1008';
-    ctx.beginPath(); ctx.ellipse(x - 4, y - 68, 2.5, 2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x + 4, y - 68, 2.5, 2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff8f0';
-    ctx.beginPath(); ctx.ellipse(x - 4, y - 68, 1.4, 1.1, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x + 4, y - 68, 1.4, 1.1, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#3858a0';
-    ctx.beginPath(); ctx.arc(x - 4, y - 68, 0.7, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x + 4, y - 68, 0.7, 0, Math.PI * 2); ctx.fill();
-
-    // nose
-    ctx.fillStyle = skinDk;
-    ctx.beginPath();
-    ctx.moveTo(x, y - 65); ctx.lineTo(x - 1.5, y - 62); ctx.lineTo(x + 1.5, y - 62);
-    ctx.closePath(); ctx.fill();
-
-    // mouth — firm line with slight upward corners
-    ctx.strokeStyle = skinDk; ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x - 3, y - 60);
-    ctx.quadraticCurveTo(x, y - 59, x + 3, y - 60);
-    ctx.stroke();
-
-    // jaw highlight
-    ctx.fillStyle = skinDk;
-    ctx.fillRect(x - 8, y - 62, 2, 6);
-    ctx.fillRect(x + 6, y - 62, 2, 6);
   }
 
   static drawMonster(ctx, type, cx, cy, facingRight, lunge = 0) {
@@ -655,12 +419,12 @@ class CharacterDrawer {
     ctx.restore();
   }
 
-  static drawWorldPlayer(ctx, cx, cy, color, accent, race = null) {
+  static drawWorldPlayer(ctx, cx, cy, color, accent) {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(0.55, 0.55);
     ctx.translate(-cx, -cy);
-    CharacterDrawer.drawHumanoid(ctx, cx, cy, color, accent, true, 0, race);
+    CharacterDrawer.drawHumanoid(ctx, cx, cy, color, accent, true, 0);
     ctx.restore();
   }
 }
