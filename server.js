@@ -13,8 +13,9 @@ try {
   process.exit(1);
 }
 
-const PORT     = Number(process.env.PORT) || 3000;
-const GAME_DIR = path.join(__dirname, 'game');
+const PORT      = Number(process.env.PORT) || 3000;
+const GAME_DIR  = path.join(__dirname, 'game');
+const GAME_CONFIG = require('./game/js/config.js');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -64,7 +65,7 @@ let   nextTradeId    = 1;
 const duelQueue    = [];         // [{ ws, id, stats }]
 const duelSessions = new Map();  // sessionId → { p1, p2, activeId, turnTimer }
 let   nextDuelId   = 1;
-const DUEL_TURN_MS = 90_000;
+const DUEL_TURN_MS = GAME_CONFIG.DUEL_TURN_SECONDS * 1000;
 
 function calcDuelDmg(atk, def, attackerDefending, defenderDefending) {
   let base = Math.max(1, atk - def * 0.5) * (0.85 + Math.random() * 0.3);
