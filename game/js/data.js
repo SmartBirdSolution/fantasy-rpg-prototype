@@ -192,3 +192,18 @@ const EQUIPMENT_TEMPLATES = {
 
 // ── LEVEL HELPERS ───────────────────────────────────────────────────
 function xpToNextLevel(level) { return level * 100; }
+
+// ── PROFESSION & COMBINATION SYSTEM ─────────────────────────────────
+const PROFESSION_NAMES = ['Adventurer', 'Champion', 'Legend'];
+
+// Zone keys match _hitWheel return values; icons are displayed in UI
+const COMBO_ZONE_KEYS  = ['top', 'mid', 'bot'];
+const COMBO_ZONE_ICONS = { top: '▲', mid: '◆', bot: '▼' };
+
+const COMBO_LIFE_ON_HIT_MULT = 0.30; // fraction of last-hit damage restored as HP
+
+// Indexed by level. ability:'lifeOnHit' → floor(lastHitDmg × mult) restored HP
+const COMBO_DEFS = [
+  null,                                                                                        // [0] unused
+  { name: 'Combination 1', length: 2, ability: 'lifeOnHit', mult: COMBO_LIFE_ON_HIT_MULT }, // [1] level 1
+];

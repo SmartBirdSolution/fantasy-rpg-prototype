@@ -73,6 +73,27 @@ class PlayerCharacter extends Character {
     // World position (tile units)
     this.worldTileX = 30;
     this.worldTileY = 30;
+    // Profession (index into PROFESSION_NAMES; 1+2 TBD)
+    this.profession = 0;
+    // Hit combinations — randomly assigned per session; one unlocked per level
+    this.combos = [];
+    this._initCombos();
+    this.activeCombinationIdx = 0; // which combo is active in battle
+    // Per-battle consecutive hit buffer (cleared by BattleScene/DuelBattleScene.init)
+    this._hitBuffer = [];
+  }
+
+  _initCombos() {
+    for (let lv = 1; lv <= this.level; lv++) {
+      const def = COMBO_DEFS[lv];
+      if (def) this._addCombo(def);
+    }
+  }
+
+  _addCombo(def) {
+    const seq = Array.from({ length: def.length }, () =>
+      COMBO_ZONE_KEYS[Math.floor(Math.random() * COMBO_ZONE_KEYS.length)]);
+    this.combos.push({ name: def.name, sequence: seq, discovered: false, def });
   }
 
   // HP regen per second (used in world loop)
@@ -98,6 +119,8 @@ class PlayerCharacter extends Character {
     this.baseAtk +=  2;
     this.baseDef +=  1;
     this.currentHP = this.maxHP;
+    const newDef = COMBO_DEFS[this.level];
+    if (newDef) this._addCombo(newDef);
   }
 
   // Add gold: updates player.gold and keeps a synced gold item in inventory

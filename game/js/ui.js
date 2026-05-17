@@ -64,6 +64,21 @@ const UI = {
       btnAdminLeathLegs:       document.getElementById('btn-admin-leather-legs'),
       btnAdminIronLegs:        document.getElementById('btn-admin-iron-legs'),
 
+      // Profile
+      profilePopup:     document.getElementById('profile-popup'),
+      btnCloseProfile:  document.getElementById('btn-close-profile'),
+      profileCharCanvas:document.getElementById('profile-char-canvas'),
+      profileName:      document.getElementById('profile-name'),
+      profileProfession:document.getElementById('profile-profession'),
+      profileStats:     document.getElementById('profile-stats'),
+      profileChampion:  document.getElementById('profile-champion'),
+      profileComboList: document.getElementById('profile-combo-list'),
+      btnProfile:       document.getElementById('btn-profile'),
+
+      // Combo bar (shown in battle)
+      comboBar:   document.getElementById('combo-bar'),
+      comboSlots: document.getElementById('combo-slots'),
+
       // City
       cityUI:         document.getElementById('city-ui'),
       cityPopulation: document.getElementById('city-population'),
@@ -77,6 +92,9 @@ const UI = {
     this._invPlayer       = null;
     this._adminPanelOpen  = false;
     this._dragInvIdx      = null; // index of bag slot being dragged
+
+    // Close profile popup
+    this._els.btnCloseProfile.addEventListener('click', () => this.closeProfile());
 
     // Close inventory context menu when clicking anywhere in the popup
     document.getElementById('inventory-popup').addEventListener('click', e => {
@@ -105,6 +123,7 @@ const UI = {
     this._els.cityUI.style.display        = name === 'city'       ? '' : 'none';
     this._els.cityPrompt.style.display    = 'none'; // always close prompt on scene change
     this._els.btnDuel.style.display       = name === 'city'       ? '' : 'none';
+    if (this._els.profilePopup) this._els.profilePopup.style.display = 'none';
 
     // Action bar is only visible in the world scene
     if (name === 'world') {
@@ -117,9 +136,8 @@ const UI = {
 
   // ── ACTION BAR ────────────────────────────────────────────────────
   initActionBar(player, onOpenInventory) {
-    this._els.btnBag.onclick = () => {
-      if (onOpenInventory) onOpenInventory();
-    };
+    this._els.btnBag.onclick     = () => { if (onOpenInventory) onOpenInventory(); };
+    this._els.btnProfile.onclick = () => this.openProfile(player);
 
     this._els.btnAdminToggle.onclick = () => {
       this._toggleAdminPanel();
@@ -179,6 +197,155 @@ const UI = {
     this._adminPanelOpen = false;
     this._els.adminPanel.style.display = 'none';
     this._els.btnAdminToggle.classList.remove('active');
+  },
+
+  // ── PROFILE POPUP ─────────────────────────────────────────────────
+  openProfile(player) {
+    if (!player) return;
+    const canvas = this._els.profileCharCanvas;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height - 10);
+      ctx.scale(1.8, 1.8);
+      player.draw(ctx, 0, 0, false, 0);
+      ctx.restore();
+    }
+    const profName = PROFESSION_NAMES[player.profession] || 'Adventurer';
+    this._els.profileName.textContent      = player.name;
+    this._els.profileProfession.textContent = `${profName}  ·  Level ${player.level}`;
+    this._els.profileStats.innerHTML =
+      `<div class="pstat-row"><span>HP</span><span>${player.currentHP}/${player.maxHP}</span></div>` +
+      `<div class="pstat-row"><span>ATK</span><span>${player.totalAtk}</span></div>` +
+      `<div class="pstat-row"><span>DEF</span><span>${player.totalDef}</span></div>` +
+      `<div class="pstat-row"><span>Gold</span><span>${player.gold}</span></div>`;
+    this._els.profileChampion.textContent = `Champion Points: ${player.championPoints}`;
+
+    const list = this._els.profileComboList;
+    if (list) {
+      if (!player.combos.length) {
+        list.innerHTML = '<div class="pcmb-empty">No combinations yet.</div>';
+      } else {
+        list.innerHTML = player.combos.map((combo, i) => {
+          const active = i === player.activeCombinationIdx;
+          const slots  = combo.sequence.map(zone => {
+            if (combo.discovered) {
+              return `<span class="pcmb-slot pcmb-slot--known zone-${zone}" data-zone="${zone}"></span>`;
+            }
+            return `<span class="pcmb-slot pcmb-slot--unknown">?</span>`;
+          }).join('');
+          return `<div class="pcmb-row${active ? ' pcmb-row--active' : ''}">
+            <span class="pcmb-name">${combo.name}${combo.discovered ? '' : ' 🔒'}</span>
+            <span class="pcmb-slots">${slots}</span>
+            <button class="pcmb-select${active ? ' pcmb-select--active' : ''}" data-idx="${i}">${active ? 'ACTIVE' : 'SELECT'}</button>
+          </div>`;
+        }).join('');
+        list.querySelectorAll('[data-zone]').forEach(sp => {
+          const cv = document.createElement('canvas');
+          cv.width = 28; cv.height = 28;
+          this._drawMiniZoneSword(cv, sp.dataset.zone);
+          sp.appendChild(cv);
+        });
+        list.querySelectorAll('.pcmb-select').forEach(btn => {
+          btn.addEventListener('click', () => {
+            player.activeCombinationIdx = Number(btn.dataset.idx);
+            this.openProfile(player);
+          });
+        });
+      }
+    }
+    this._els.profilePopup.style.display = 'flex';
+  },
+
+  closeProfile() {
+    this._els.profilePopup.style.display = 'none';
+  },
+
+  // ── COMBO BAR (battle only) ────────────────────────────────────────
+  showCombatBar(player) {
+    this._els.comboBar.style.display = 'flex';
+    this.updateCombatBar(player);
+  },
+
+  hideCombatBar() {
+    this._els.comboBar.style.display = 'none';
+  },
+
+  _drawMiniZoneSword(canvas, zone) {
+    const ctx = canvas.getContext('2d');
+    const S = canvas.width;
+    ctx.clearRect(0, 0, S, S);
+    const ANGLES = { top: 300, mid: 0, bot: 60 };
+    const COLORS = { top: '#9060dd', mid: '#30c060', bot: '#e07030' };
+    const ang   = ((ANGLES[zone] ?? 0) * Math.PI) / 180;
+    const color = COLORS[zone] ?? '#aaaaaa';
+    const sc    = S / 84; // 84 ≈ sword span (gripEnd=-14 to tipX=58 + margin)
+
+    ctx.save();
+    ctx.translate(S / 2, S / 2);
+    ctx.rotate(ang);
+    ctx.scale(sc, sc);
+    ctx.translate(-22, 0); // center sword length on canvas
+
+    const tipX = 58, bW = 4.2, sharpLen = 13, gX = 0;
+    const cgW = 3, cgH = 7, gripW = 1.7, hLen = 11;
+    const gripX = gX - cgW, gripEnd = gripX - hLen;
+
+    // Blade
+    const blGrad = ctx.createLinearGradient(gX, -bW, gX, bW);
+    blGrad.addColorStop(0,   '#50546a');
+    blGrad.addColorStop(0.4, '#d8dcf0');
+    blGrad.addColorStop(0.5, '#f0f4ff');
+    blGrad.addColorStop(0.6, '#d8dcf0');
+    blGrad.addColorStop(1,   '#50546a');
+    ctx.fillStyle = blGrad;
+    ctx.beginPath();
+    ctx.moveTo(gX + 5.5, -bW);
+    ctx.lineTo(tipX - sharpLen, -bW);
+    ctx.lineTo(tipX, 0);
+    ctx.lineTo(tipX - sharpLen, bW);
+    ctx.lineTo(gX + 5.5, bW);
+    ctx.closePath(); ctx.fill();
+
+    // Central fuller groove
+    ctx.strokeStyle = 'rgba(28,30,48,0.55)'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(tipX - sharpLen - 2, 0); ctx.lineTo(gX + 8, 0); ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // Crossguard (zone colour, glowing)
+    ctx.shadowColor = color; ctx.shadowBlur = 4;
+    ctx.fillStyle = color;
+    ctx.fillRect(gX - cgW, -cgH, cgW * 2, cgH * 2);
+    ctx.shadowBlur = 0;
+
+    // Grip
+    ctx.fillStyle = '#522206';
+    ctx.fillRect(gripEnd, -gripW, hLen, gripW * 2);
+
+    ctx.restore();
+  },
+
+  updateCombatBar(player) {
+    const slots = this._els.comboSlots;
+    if (!slots) return;
+    const combo = player.combos[player.activeCombinationIdx];
+    if (!combo) { slots.innerHTML = ''; return; }
+    slots.innerHTML = '';
+    combo.sequence.forEach(zone => {
+      const div = document.createElement('div');
+      if (combo.discovered) {
+        div.className = `cb-slot cb-slot--known zone-${zone}`;
+        const cv = document.createElement('canvas');
+        cv.width = 36; cv.height = 36;
+        this._drawMiniZoneSword(cv, zone);
+        div.appendChild(cv);
+      } else {
+        div.className = 'cb-slot cb-slot--unknown';
+        div.textContent = '?';
+      }
+      slots.appendChild(div);
+    });
   },
 
   // ── FADE ──────────────────────────────────────────────────────────

@@ -23,6 +23,9 @@ const Network = {
   onDuelForfeit:    null, // ({ xpGained })
   onDuelHeal:       null, // ({ sessionId, total })
 
+  // Combination heal callback (set by DuelBattleScene)
+  onComboHeal: null, // ({ sessionId, total })
+
   // City callbacks (set by game layer)
   onCityPopulation: null, // (count)
 
@@ -128,6 +131,10 @@ const Network = {
         if (this.onDuelHeal) this.onDuelHeal(msg);
         break;
 
+      case 'combo_heal':
+        if (this.onComboHeal) this.onComboHeal(msg);
+        break;
+
       case 'trade_request':
         if (this.onTradeRequest) this.onTradeRequest(msg);
         break;
@@ -194,6 +201,10 @@ const Network = {
 
   sendDuelHeal(sessionId, total) {
     this._send({ type: 'duel_heal', sessionId, total });
+  },
+
+  sendComboHeal(sessionId, total) {
+    this._send({ type: 'combo_heal', sessionId, total });
   },
 
   // ── City senders ─────────────────────────────────────────────────────

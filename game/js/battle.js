@@ -42,6 +42,11 @@ class BattleScene {
     this.onBattleEnd = null;
     this._ended      = false;
 
+    this._hitBuffer        = [];
+    this._pendingComboHeal = 0;
+    this._comboFlashT      = 0;
+    this._comboJumpT       = 0;
+
     this._clickHandler = e => this._handleClick(e);
     this._moveHandler  = e => this._handleMove(e);
   }
@@ -52,6 +57,9 @@ class BattleScene {
     if (pSpd > eSpd)      this.playerTurn = true;
     else if (eSpd > pSpd) this.playerTurn = false;
     else                  this.playerTurn = Math.random() < 0.5;
+
+    this.player._hitBuffer = [];
+    UI.showCombatBar(this.player);
 
     this._log(`⚔ Battle start vs ${this.enemy.type} (Lv${this.enemy.level})!`, 'log-system');
     this._log(this.playerTurn ? 'You move first!' : `${this.enemy.type} moves first!`, 'log-system');
@@ -71,6 +79,7 @@ class BattleScene {
   }
 
   destroy() {
+    UI.hideCombatBar();
     this.canvas.removeEventListener('click',     this._clickHandler);
     this.canvas.removeEventListener('mousemove', this._moveHandler);
     this.canvas.style.cursor = 'default';
@@ -158,6 +167,8 @@ class BattleScene {
     let playerDmg = this._calcDmg(this.player, this.enemy, zone, enemyDecision.blockZone);
     let enemyDmg  = this._calcDmg(this.enemy,  this.player, enemyDecision.action, null);
 
+    this._checkCombo(zone, playerDmg);
+
     const defending = this.playerDefending;
     if (defending) {
       playerDmg = Math.round(playerDmg * 0.5);
@@ -227,6 +238,14 @@ class BattleScene {
       if (playerDmg > 0) {
         this.enemy.takeDamage(playerDmg);
         this._spawnFloat(playerDmg, 'enemy');
+        if (this._pendingComboHeal > 0) {
+          const h = this._pendingComboHeal;
+          this._pendingComboHeal = 0;
+          this.player.currentHP = Math.min(this.player.maxHP, this.player.currentHP + h);
+          this.spawnHealFloat(h, 'player');
+          this._log(`✦ Combination! Restored ${h} HP.`, 'log-loot');
+          UI.updateCombatBar(this.player);
+        }
       }
       if (!this.enemy.isAlive()) { this._endBattle('win'); return; }
       UI.setTurnIndicator(false);
@@ -309,6 +328,45 @@ class BattleScene {
     return drops;
   }
 
+  _checkCombo(zone, dmg) {
+    const combo = this.player.combos[this.player.activeCombinationIdx];
+    if (!combo) return;
+    const buf = this.player._hitBuffer;
+    buf.push(zone);
+    if (buf.length > combo.sequence.length) buf.splice(0, buf.length - combo.sequence.length);
+    if (buf.length < combo.sequence.length) return;
+    if (!combo.sequence.every((z, i) => z === buf[i])) return;
+    // Combo matched!
+    if (!combo.discovered) {
+      combo.discovered = true;
+      this._log(`✦ Discovered: ${combo.name}!`, 'log-loot');
+      UI.updateCombatBar(this.player);
+    }
+    this._pendingComboHeal = Math.max(1, Math.floor(dmg * combo.def.mult));
+    this._comboFlashT = 1.0;
+    this._comboJumpT  = 1.0;
+  }
+
+  spawnHealFloat(amount, target) {
+    const W = this.canvas.width, H = this.canvas.height;
+    const x = target === 'player'
+      ? W * 0.28 + (Math.random() - 0.5) * 30
+      : W * 0.72 + (Math.random() - 0.5) * 30;
+    this.floats.push({ text: `+${amount}`, x, y: H * 0.42, life: 1.4, maxLife: 1.4,
+      color: '#44ff88', font: 'bold 28px monospace' });
+  }
+
+  _drawComboFlash(ctx, cx, cy, t) {
+    const charCY = cy - 68;
+    const r = 55 + (1 - t) * 35;
+    const g = ctx.createRadialGradient(cx, charCY, 10, cx, charCY, r);
+    g.addColorStop(0,   `rgba(255,220,60,${t * 0.7})`);
+    g.addColorStop(0.6, `rgba(255,150,30,${t * 0.3})`);
+    g.addColorStop(1,   'rgba(255,100,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, charCY, r, 0, Math.PI * 2); ctx.fill();
+  }
+
   _spawnFloat(dmg, target) {
     const W = this.canvas.width, H = this.canvas.height;
     const x = target === 'enemy'
@@ -325,6 +383,8 @@ class BattleScene {
   // ── UPDATE ─────────────────────────────────────────────────────────
   update(dt) {
     this._animTime += dt;
+    if (this._comboFlashT > 0) this._comboFlashT = Math.max(0, this._comboFlashT - dt * 2.5);
+    if (this._comboJumpT  > 0) this._comboJumpT  = Math.max(0, this._comboJumpT  - dt * 2.5);
 
     if (this.animState === 'playerAtk' || this.animState === 'enemyAtk') {
       this.animT += dt * 2.8;
@@ -374,16 +434,19 @@ class BattleScene {
     }
 
     // Player
-    const pLunge = this.animState === 'playerAtk' ? Math.sin(this.animT * Math.PI) * 50 : 0;
+    const pLunge  = this.animState === 'playerAtk' ? Math.sin(this.animT * Math.PI) * 50 : 0;
+    const jumpOff = this._comboJumpT > 0 ? Math.sin((1 - this._comboJumpT) * Math.PI) * 45 : 0;
     ctx.save();
-    ctx.translate(W * 0.25 + pLunge, H * 0.68);
+    ctx.translate(W * 0.25 + pLunge, H * 0.68 - jumpOff);
     ctx.scale(2, 2);
     this.player.draw(ctx, 0, 0, true, 0);
     ctx.restore();
 
+    if (this._comboFlashT > 0) this._drawComboFlash(ctx, W * 0.25, H * 0.68 - jumpOff, this._comboFlashT);
+
     // Defense shield aura on player
     if (this.playerDefending) {
-      this._drawDefenseShield(ctx, W * 0.25, H * 0.68);
+      this._drawDefenseShield(ctx, W * 0.25, H * 0.68 - jumpOff);
     }
 
     // Enemy
@@ -1288,6 +1351,12 @@ class DuelBattleScene {
     this._countdownHandle = null;
     this.playerDefending  = false;
 
+    this._hitBuffer        = [];
+    this._pendingComboHeal = 0;
+    this._comboFlashT      = 0;
+    this._comboJumpT       = 0;
+    this._lastSentZone     = null;
+
     this.onDuelEnd = null;
     this._ended    = false;
 
@@ -1300,6 +1369,9 @@ class DuelBattleScene {
   }
 
   init() {
+    this.player._hitBuffer = [];
+    UI.showCombatBar(this.player);
+
     this._log(`⚔ Duel vs ${this.opponent.name} (Lv${this.opponent.level})!`, 'log-system');
 
     this.canvas.addEventListener('click',     this._clickHandler);
@@ -1307,6 +1379,12 @@ class DuelBattleScene {
 
     Network.onDuelAttack  = d => this._onAttackResult(d);
     Network.onDuelForfeit = d => this._onForfeit(d);
+    Network.onComboHeal   = ({ sessionId, total }) => {
+      if (sessionId !== this.sessionId || this._ended) return;
+      this.opponentCurrentHP = Math.min(this.opponent.maxHP, this.opponentCurrentHP + total);
+      this.spawnHealFloat(total, 'opponent');
+      this._log(`✦ ${this.opponent.name} used Combination! +${total} HP`, 'log-system');
+    };
     Network.onDuelHeal    = d => {
       const info = d.total;
       if (!info || typeof info !== 'object') return;
@@ -1326,6 +1404,7 @@ class DuelBattleScene {
   }
 
   destroy() {
+    UI.hideCombatBar();
     this._stopCountdown();
     this.canvas.removeEventListener('click',     this._clickHandler);
     this.canvas.removeEventListener('mousemove', this._moveHandler);
@@ -1333,6 +1412,7 @@ class DuelBattleScene {
     Network.onDuelAttack  = null;
     Network.onDuelForfeit = null;
     Network.onDuelHeal    = null;
+    Network.onComboHeal   = null;
   }
 
   toggleDefense() {
@@ -1445,6 +1525,7 @@ class DuelBattleScene {
     this.state = 'waiting';
     const el = document.getElementById('turn-indicator');
     if (el) { el.className = 'duel-resolve'; el.textContent = 'ATTACKING...'; }
+    this._lastSentZone = seg;
     Network.sendDuelZone(this.sessionId, seg, this.playerDefending);
   }
 
@@ -1485,6 +1566,8 @@ class DuelBattleScene {
       this._log(`${this.opponent.name} strikes you for ${data.dmg} damage!`);
     }
 
+    if (data.attackerIsMe && !data.timedOut) this._checkCombo(this._lastSentZone, data.dmg);
+
     this.state     = 'animating';
     this.animState = data.attackerIsMe ? 'playerAtk' : 'enemyAtk';
     this.animT     = 0;
@@ -1493,6 +1576,16 @@ class DuelBattleScene {
       if (data.attackerIsMe) {
         this.opponentCurrentHP = Math.max(0, this.opponentCurrentHP - data.dmg);
         this._spawnFloat(data.dmg, 'opponent');
+        if (this._pendingComboHeal > 0) {
+          const h = this._pendingComboHeal;
+          this._pendingComboHeal = 0;
+          this.player.currentHP = Math.min(this.player.maxHP, this.player.currentHP + h);
+          this.spawnHealFloat(h, 'player');
+          this._comboFlashT = 1.0;
+          this._log(`✦ Combination! Restored ${h} HP.`, 'log-loot');
+          UI.updateCombatBar(this.player);
+          Network.sendComboHeal(this.sessionId, h);
+        }
       } else {
         this.player.takeDamage(data.dmg);
         this._spawnFloat(data.dmg, 'player');
@@ -1544,6 +1637,45 @@ class DuelBattleScene {
     setTimeout(() => { this.destroy(); if (this.onDuelEnd) this.onDuelEnd(won ? 'win' : 'lose'); }, 2200);
   }
 
+  _checkCombo(zone, dmg) {
+    if (!zone) return;
+    const combo = this.player.combos[this.player.activeCombinationIdx];
+    if (!combo) return;
+    const buf = this.player._hitBuffer;
+    buf.push(zone);
+    if (buf.length > combo.sequence.length) buf.splice(0, buf.length - combo.sequence.length);
+    if (buf.length < combo.sequence.length) return;
+    if (!combo.sequence.every((z, i) => z === buf[i])) return;
+    if (!combo.discovered) {
+      combo.discovered = true;
+      this._log(`✦ Discovered: ${combo.name}!`, 'log-loot');
+      UI.updateCombatBar(this.player);
+    }
+    this._pendingComboHeal = Math.max(1, Math.floor(dmg * combo.def.mult));
+    this._comboFlashT = 1.0;
+    this._comboJumpT  = 1.0;
+  }
+
+  spawnHealFloat(amount, target) {
+    const W = this.canvas.width, H = this.canvas.height;
+    const x = target === 'player'
+      ? W * 0.28 + (Math.random() - 0.5) * 30
+      : W * 0.72 + (Math.random() - 0.5) * 30;
+    this.floats.push({ text: `+${amount}`, x, y: H * 0.42, life: 1.4, maxLife: 1.4,
+      color: '#44ff88', font: 'bold 28px monospace' });
+  }
+
+  _drawComboFlash(ctx, cx, cy, t) {
+    const charCY = cy - 68;
+    const r = 55 + (1 - t) * 35;
+    const g = ctx.createRadialGradient(cx, charCY, 10, cx, charCY, r);
+    g.addColorStop(0,   `rgba(255,220,60,${t * 0.7})`);
+    g.addColorStop(0.6, `rgba(255,150,30,${t * 0.3})`);
+    g.addColorStop(1,   'rgba(255,100,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, charCY, r, 0, Math.PI * 2); ctx.fill();
+  }
+
   _spawnFloat(dmg, target) {
     const W = this.canvas.width, H = this.canvas.height;
     const x = target === 'opponent'
@@ -1557,6 +1689,8 @@ class DuelBattleScene {
   // ── UPDATE ─────────────────────────────────────────────────────────
   update(dt) {
     this._animTime += dt;
+    if (this._comboFlashT > 0) this._comboFlashT = Math.max(0, this._comboFlashT - dt * 2.5);
+    if (this._comboJumpT  > 0) this._comboJumpT  = Math.max(0, this._comboJumpT  - dt * 2.5);
 
     if (this._oppHotRemaining > 0) {
       const tick = Math.min(this._oppHotRemaining, dt);
@@ -1614,13 +1748,15 @@ class DuelBattleScene {
     ctx.fillText('⚔  D U E L  ⚔', W / 2, H * 0.15);
 
     // Player (left)
-    const pLunge = this.animState === 'playerAtk' ? Math.sin(this.animT * Math.PI) * 50 : 0;
+    const pLunge  = this.animState === 'playerAtk' ? Math.sin(this.animT * Math.PI) * 50 : 0;
+    const jumpOff = this._comboJumpT > 0 ? Math.sin((1 - this._comboJumpT) * Math.PI) * 45 : 0;
     ctx.save();
-    ctx.translate(W * 0.25 + pLunge, H * 0.68);
+    ctx.translate(W * 0.25 + pLunge, H * 0.68 - jumpOff);
     ctx.scale(2, 2);
     this.player.draw(ctx, 0, 0, true, 0);
     ctx.restore();
-    if (this.playerDefending) this._drawDefenseShield(ctx, W * 0.25, H * 0.68);
+    if (this._comboFlashT > 0) this._drawComboFlash(ctx, W * 0.25, H * 0.68 - jumpOff, this._comboFlashT);
+    if (this.playerDefending) this._drawDefenseShield(ctx, W * 0.25, H * 0.68 - jumpOff);
 
     // Opponent (right, humanoid, facing left)
     const eLunge = this.animState === 'enemyAtk' ? -Math.sin(this.animT * Math.PI) * 50 : 0;
