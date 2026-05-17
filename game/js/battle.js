@@ -1307,12 +1307,10 @@ class DuelBattleScene {
 
     Network.onDuelAttack  = d => this._onAttackResult(d);
     Network.onDuelForfeit = d => this._onForfeit(d);
-    Network.onDuelHeal    = d => {
-      const info = d.total;
-      if (!info || typeof info !== 'object') return;
-      this._log(`Opponent used ${info.itemName}! (+${info.hotHps} HP/s for ${info.hotDuration}s)`, 'log-system');
-      this._oppHotHps       = info.hotHps;
-      this._oppHotRemaining = info.hotDuration;
+    Network.onDuelElixir  = d => {
+      this._log(`Opponent used ${d.itemName}! (+${d.hotHps} HP/s for ${d.hotDuration}s)`, 'log-system');
+      this._oppHotHps       = d.hotHps;
+      this._oppHotRemaining = d.hotDuration;
       this._oppHotAccum     = 0;
     };
 
@@ -1332,7 +1330,7 @@ class DuelBattleScene {
     this.canvas.style.cursor = 'default';
     Network.onDuelAttack  = null;
     Network.onDuelForfeit = null;
-    Network.onDuelHeal    = null;
+    Network.onDuelElixir  = null;
   }
 
   toggleDefense() {
@@ -2437,7 +2435,7 @@ class DuelBattleScene {
     if (!item || slotIdx >= this.player.elixirSlotsAvailable) return;
     this.player.useElixirSlot(slotIdx);
     this._log(`You drink ${item.name}! +${item.hotHps} HP/s for ${item.hotDuration}s`, 'log-system');
-    if (Network.connected) Network.sendDuelHeal(this.sessionId, { hotHps: item.hotHps, hotDuration: item.hotDuration, itemName: item.name });
+    if (Network.connected) Network.sendDuelElixir(this.sessionId, item.hotHps, item.hotDuration, item.name);
   }
 
   _drawElixirBelt(ctx, W, H) {
