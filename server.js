@@ -280,6 +280,17 @@ wss.on('connection', ws => {
         break;
       }
 
+      case 'duel_elixir': {
+        const { sessionId, hotHps, hotDuration } = msg;
+        const sess = duelSessions.get(sessionId);
+        if (!sess) break;
+        const myKey  = sess.p1.id === id ? 'p1' : sess.p2.id === id ? 'p2' : null;
+        if (!myKey) break;
+        const defKey = myKey === 'p1' ? 'p2' : 'p1';
+        sendTo(sess[defKey].ws, { type: 'duel_elixir', sessionId, hotHps, hotDuration });
+        break;
+      }
+
       case 'city_enter': {
         cityPlayers.add(id);
         state.scene = 'city';

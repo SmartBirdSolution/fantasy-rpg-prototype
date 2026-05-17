@@ -1280,6 +1280,10 @@ class DuelBattleScene {
     this.hoveredElixir  = null;
     this.floats         = [];
 
+    this._opponentHotHps       = 0;
+    this._opponentHotRemaining = 0;
+    this._opponentHotAccum     = 0;
+
     this._countdown       = 90;
     this._countdownHandle = null;
     this.playerDefending  = false;
@@ -1303,7 +1307,16 @@ class DuelBattleScene {
 
     Network.onDuelAttack  = d => this._onAttackResult(d);
     Network.onDuelForfeit = d => this._onForfeit(d);
-    Network.onDuelHealTick = d => { this.opponentCurrentHP = d.currentHP; this.spawnHealFloat(d.pts, 'opponent'); };
+    Network.onDuelHealTick = d => {
+      this.opponentCurrentHP     = d.currentHP;
+      this._opponentHotRemaining = 0;  // per-tick is authoritative; stop simulation
+      this.spawnHealFloat(d.pts, 'opponent');
+    };
+    Network.onDuelElixir = d => {
+      this._opponentHotHps       = d.hotHps;
+      this._opponentHotRemaining = d.hotDuration;
+      this._opponentHotAccum     = 0;
+    };
 
     if (this._firstTurn) {
       this._log('You go first — pick a zone!', 'log-system');
@@ -1322,6 +1335,7 @@ class DuelBattleScene {
     Network.onDuelAttack  = null;
     Network.onDuelForfeit = null;
     Network.onDuelHealTick = null;
+    Network.onDuelElixir   = null;
   }
 
   toggleDefense() {
@@ -1554,6 +1568,18 @@ class DuelBattleScene {
         const cb = this._onAnimDone;
         this._onAnimDone = null;
         if (cb) cb();
+      }
+    }
+
+    // Simulate opponent HoT (started by duel_elixir, cancelled when duel_heal_tick arrives)
+    if (this._opponentHotRemaining > 0) {
+      this._opponentHotAccum += Math.min(this._opponentHotRemaining, dt) * this._opponentHotHps;
+      this._opponentHotRemaining = Math.max(0, this._opponentHotRemaining - dt);
+      if (this._opponentHotAccum >= 1) {
+        const pts = Math.floor(this._opponentHotAccum);
+        this._opponentHotAccum -= pts;
+        this.opponentCurrentHP = Math.min(this.opponent.maxHP, this.opponentCurrentHP + pts);
+        this.spawnHealFloat(pts, 'opponent');
       }
     }
 
@@ -2414,7 +2440,9 @@ class DuelBattleScene {
     if (!item || slotIdx >= this.player.elixirSlotsAvailable) return;
     this.player.useElixirSlot(slotIdx);
     this._log(`You drink ${item.name}! +${item.hotHps} HP/s for ${item.hotDuration}s`, 'log-system');
-    // per-tick heal messages sent from game.js loop, not here
+    if (Network.connected && item.hotHps) {
+      Network.sendDuelElixir(this.sessionId, item.hotHps, item.hotDuration);
+    }
   }
 
   _drawElixirBelt(ctx, W, H) {
