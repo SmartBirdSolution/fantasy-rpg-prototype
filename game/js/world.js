@@ -1,5 +1,16 @@
 'use strict';
 
+// Painterly mid-tone color per tile type (keyed by TILE constant values)
+const _TILE_PAINT = {
+  0: '#3c8048',  // GRASS
+  1: '#1c5428',  // FOREST
+  2: '#1c5e92',  // WATER
+  3: '#bc9a68',  // ROAD
+  4: '#c8a458',  // VILLAGE
+  5: '#686878',  // MOUNTAIN
+  6: '#ccb868',  // SAND
+};
+
 class WorldScene {
   constructor(canvas, player) {
     this.canvas = canvas;
@@ -210,6 +221,14 @@ class WorldScene {
     this._drawPlayer();
 
     ctx.restore();
+
+    // Screen-edge vignette — painterly fog atmosphere
+    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.30,
+                                        W / 2, H / 2, Math.max(W, H) * 0.82);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.48)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
   }
 
   _drawTiles() {
@@ -220,65 +239,160 @@ class WorldScene {
     const endX   = Math.min(MAP_W - 1, Math.ceil((this.cam.x + this.canvas.width)  / ts));
     const endY   = Math.min(MAP_H - 1, Math.ceil((this.cam.y + this.canvas.height) / ts));
 
+    // Pass 1 — flat painted base fills (no grid lines)
+    for (let ty = startY; ty <= endY; ty++) {
+      for (let tx = startX; tx <= endX; tx++) {
+        ctx.fillStyle = _TILE_PAINT[MAP_DATA[ty][tx]];
+        ctx.fillRect(tx * ts, ty * ts, ts, ts);
+      }
+    }
+
+    // Pass 1b — single diagonal sheen over all tiles (one gradient, painted light direction)
+    const vw = this.canvas.width, vh = this.canvas.height;
+    const sg = ctx.createLinearGradient(this.cam.x, this.cam.y, this.cam.x + vw, this.cam.y + vh);
+    sg.addColorStop(0,   'rgba(255,255,255,0.055)');
+    sg.addColorStop(0.5, 'rgba(255,255,255,0)');
+    sg.addColorStop(1,   'rgba(0,0,0,0.080)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(this.cam.x, this.cam.y, vw, vh);
+
+    // Pass 2 — soft blend strips where tile types meet (painterly, no hard edges)
+    const B = 5;
+    for (let ty = startY; ty <= endY; ty++) {
+      for (let tx = startX; tx <= endX; tx++) {
+        const tt = MAP_DATA[ty][tx];
+        const mc = _TILE_PAINT[tt];
+        const px = tx * ts, py = ty * ts;
+        if (tx + 1 <= endX) {
+          const rt = MAP_DATA[ty][tx + 1];
+          if (rt !== tt) {
+            const g = ctx.createLinearGradient(px + ts - B, 0, px + ts + B, 0);
+            g.addColorStop(0, mc); g.addColorStop(1, _TILE_PAINT[rt]);
+            ctx.fillStyle = g; ctx.fillRect(px + ts - B, py, B * 2, ts);
+          }
+        }
+        if (ty + 1 <= endY) {
+          const bt = MAP_DATA[ty + 1][tx];
+          if (bt !== tt) {
+            const g = ctx.createLinearGradient(0, py + ts - B, 0, py + ts + B);
+            g.addColorStop(0, mc); g.addColorStop(1, _TILE_PAINT[bt]);
+            ctx.fillStyle = g; ctx.fillRect(px, py + ts - B, ts, B * 2);
+          }
+        }
+      }
+    }
+
+    // Pass 3 — decorations on top of blended ground
     for (let ty = startY; ty <= endY; ty++) {
       for (let tx = startX; tx <= endX; tx++) {
         const tileType = MAP_DATA[ty][tx];
-        const meta     = TILE_META[tileType];
         const px = tx * ts, py = ty * ts;
-
-        ctx.fillStyle = meta.color;
-        ctx.fillRect(px, py, ts, ts);
-
-        ctx.strokeStyle = meta.border;
-        ctx.lineWidth   = 0.4;
-        ctx.strokeRect(px + 0.5, py + 0.5, ts - 1, ts - 1);
-
         if (tileType === TILE.FOREST)   this._drawTree(ctx, px + ts/2, py + ts/2 - 2, tx, ty);
         if (tileType === TILE.MOUNTAIN) this._drawPeak(ctx, px + ts/2, py + ts);
-        if (tileType === TILE.WATER)    this._drawWave(ctx, px, py, ts);
+        if (tileType === TILE.WATER)    this._drawWave(ctx, px, py, ts, tx, ty);
       }
     }
   }
 
   _drawTree(ctx, cx, cy, tx, ty) {
     const seed = (tx * 7 + ty * 13) % 4;
-    const h = 10 + seed * 2;
-    ctx.fillStyle = '#0d3a18';
+    const r = 7 + seed * 1.2;
+    // Shadow blob on ground
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.moveTo(cx, cy - h);
-    ctx.lineTo(cx - 7 + seed, cy + 2);
-    ctx.lineTo(cx + 7 - seed, cy + 2);
-    ctx.closePath();
+    ctx.ellipse(cx + 2, cy + r * 0.6, r * 0.85, r * 0.32, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#3d1a08';
-    ctx.fillRect(cx - 2, cy + 2, 4, 4);
+    ctx.globalAlpha = 1;
+    // Trunk
+    ctx.fillStyle = '#5a3210';
+    ctx.fillRect(cx - 2, cy, 4, r * 0.7);
+    // Canopy — radial gradient, dark at edges, bright highlight top-left
+    const canopyGrad = ctx.createRadialGradient(cx - r * 0.28, cy - r * 0.3, r * 0.12, cx, cy, r);
+    canopyGrad.addColorStop(0,   '#72c84a');
+    canopyGrad.addColorStop(0.5, '#3a8230');
+    canopyGrad.addColorStop(1,   '#1a4a18');
+    ctx.fillStyle = canopyGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    // Tiny specular fleck
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = '#c8f0a0';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.26, cy - r * 0.28, r * 0.22, r * 0.14, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   _drawPeak(ctx, cx, cy) {
-    ctx.fillStyle = '#9090a0';
+    const h = 22;
+    // Shadow right face
+    ctx.fillStyle = '#50505f';
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 22);
-    ctx.lineTo(cx - 12, cy);
+    ctx.moveTo(cx, cy - h);
+    ctx.lineTo(cx, cy);
     ctx.lineTo(cx + 12, cy);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = '#dde';
+    // Light left face — gradient from peak down
+    const lg = ctx.createLinearGradient(cx - 12, cy - h, cx, cy);
+    lg.addColorStop(0, '#c8cad8');
+    lg.addColorStop(1, '#888898');
+    ctx.fillStyle = lg;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 22);
-    ctx.lineTo(cx - 5, cy - 14);
-    ctx.lineTo(cx + 5, cy - 14);
+    ctx.moveTo(cx, cy - h);
+    ctx.lineTo(cx - 12, cy);
+    ctx.lineTo(cx, cy);
     ctx.closePath();
     ctx.fill();
+    // Snow cap
+    const snowH = h * 0.38;
+    ctx.fillStyle = '#eef0f8';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - h);
+    ctx.lineTo(cx - 5.5, cy - h + snowH);
+    ctx.lineTo(cx + 4,   cy - h + snowH * 0.8);
+    ctx.closePath();
+    ctx.fill();
+    // Snow shadow edge
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = '#6070a0';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - h);
+    ctx.lineTo(cx, cy - h + snowH * 0.9);
+    ctx.lineTo(cx + 4, cy - h + snowH * 0.8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
-  _drawWave(ctx, px, py, ts) {
-    ctx.strokeStyle = 'rgba(150,220,255,0.25)';
-    ctx.lineWidth = 1.5;
+  _drawWave(ctx, px, py, ts, tx, ty) {
+    const seed = (tx * 3 + ty * 7) % 3;
+    const off  = seed * 3;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(180,235,255,0.30)';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    // First wave — upper
+    const y1 = py + ts * 0.38 + off;
     ctx.beginPath();
-    ctx.moveTo(px + 4, py + ts/2);
-    ctx.quadraticCurveTo(px + ts/3, py + ts/2 - 4, px + ts/2, py + ts/2);
-    ctx.quadraticCurveTo(px + ts*2/3, py + ts/2 + 4, px + ts - 4, py + ts/2);
+    ctx.moveTo(px + 3, y1);
+    ctx.quadraticCurveTo(px + ts * 0.28, y1 - 4, px + ts * 0.52, y1);
+    ctx.quadraticCurveTo(px + ts * 0.76, y1 + 4, px + ts - 3, y1);
     ctx.stroke();
+    // Second wave — lower, subtler
+    ctx.strokeStyle = 'rgba(140,210,255,0.18)';
+    ctx.lineWidth = 1.2;
+    const y2 = py + ts * 0.62 + off;
+    ctx.beginPath();
+    ctx.moveTo(px + 5, y2);
+    ctx.quadraticCurveTo(px + ts * 0.32, y2 + 3.5, px + ts * 0.56, y2);
+    ctx.quadraticCurveTo(px + ts * 0.78, y2 - 3.5, px + ts - 5, y2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   _drawHouse(ctx, cx, cy, tx, ty) {
