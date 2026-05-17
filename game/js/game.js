@@ -172,6 +172,9 @@ class Game {
     UI.hideDuelPopup();
     if (this.scene !== 'world' && this.scene !== 'city') return;
 
+    this._preDuelScene    = this.scene;
+    this._preDuelHP       = this.player.currentHP;
+
     this.scene         = 'transitioning';
     this.duelSessionId = data.sessionId;
     const opp          = data.opponent;
@@ -194,9 +197,17 @@ class Game {
   }
 
   _endDuel(result) {
+    const fromCity = this._preDuelScene === 'city';
+    const savedHP  = this._preDuelHP;
 
     UI.fadeOut(() => {
-      if (result === 'win') {
+      if (fromCity) {
+        this.player.currentHP = savedHP ?? this.player.maxHP;
+        UI.showScene('city');
+        UI.updateWorldStats(this.player);
+        this.scene = 'city';
+        UI.fadeIn(null);
+      } else if (result === 'win') {
         this.worldScene.startBattleCooldown();
         UI.showScene('world');
         UI.updateWorldStats(this.player);
@@ -218,6 +229,8 @@ class Game {
       }
       this.duelScene     = null;
       this.duelSessionId = null;
+      this._preDuelScene = null;
+      this._preDuelHP    = null;
     });
   }
 
