@@ -171,11 +171,25 @@ class PlayerCharacter extends Character {
   }
 }
 
+// ── MOB BASE CLASS ───────────────────────────────────────────────────
+class Mob extends Character {
+  constructor(name, hp, atk, def, spd, color, accent, respawnTime = 30) {
+    super(name, hp, atk, def, spd, color, accent);
+    this.respawnTime   = respawnTime;
+    this._respawnTimer = -1;         // -1 = alive; ≥0 = counting down to respawn
+    this._roamX        = 0;
+    this._roamY        = 0;
+    this._roamTargetX  = 0;
+    this._roamTargetY  = 0;
+    this._roamTimer    = Math.random() * 3; // stagger initial wander
+  }
+}
+
 // ── ENEMY CHARACTER ─────────────────────────────────────────────────
-class EnemyCharacter extends Character {
+class EnemyCharacter extends Mob {
   constructor(type, spawnTX, spawnTY) {
     const t = ENEMY_TYPES[type];
-    super(type, t.baseHP, t.baseAtk, t.baseDef, t.spd, t.color, t.accent);
+    super(type, t.baseHP, t.baseAtk, t.baseDef, t.spd, t.color, t.accent, t.respawnTime ?? 30);
     this.type       = type;
     this.level      = t.level;
     this.xpReward   = t.xp;
@@ -183,6 +197,11 @@ class EnemyCharacter extends Character {
     this.spawnTX    = spawnTX;
     this.spawnTY    = spawnTY;
     this.defeated   = false;
+    // Initialise roam position at spawn
+    this._roamX       = spawnTX * TILE_SIZE + TILE_SIZE / 2;
+    this._roamY       = spawnTY * TILE_SIZE + TILE_SIZE / 2;
+    this._roamTargetX = this._roamX;
+    this._roamTargetY = this._roamY;
   }
 
   chooseAction() {

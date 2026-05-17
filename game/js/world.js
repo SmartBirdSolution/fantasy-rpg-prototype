@@ -119,14 +119,56 @@ class WorldScene {
     this._movePlayer(dt);
     this._lerpCamera();
 
-    // Keep local defeated state in sync with network
+    // Sync defeated state from network, then tick roam / respawn
     for (let i = 0; i < this.enemies.length; i++) {
-      if (!this.enemies[i].defeated && Network.isEnemyDefeated(i)) {
-        this.enemies[i].defeated = true;
+      const e = this.enemies[i];
+      if (!e.defeated && Network.isEnemyDefeated(i)) e.defeated = true;
+
+      if (e.defeated) {
+        if (e._respawnTimer < 0) e._respawnTimer = e.respawnTime; // start countdown
+        e._respawnTimer -= dt;
+        if (e._respawnTimer <= 0) {
+          e.defeated        = false;
+          e._respawnTimer   = -1;
+          e.currentHP       = e.maxHP;
+          e._roamX          = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
+          e._roamY          = e.spawnTY * TILE_SIZE + TILE_SIZE / 2;
+          e._roamTargetX    = e._roamX;
+          e._roamTargetY    = e._roamY;
+          e._roamTimer      = Math.random() * 2;
+          Network.clearEnemyDefeated(i);
+        }
+      } else if (!Network.isEnemyLocked(i)) {
+        this._updateMobRoam(e, dt);
       }
     }
 
     if (this._battleCooldown <= 0 && this._cityCooldown <= 0) this._checkCollisions();
+  }
+
+  _updateMobRoam(e, dt) {
+    const ROAM_RADIUS = 2.5 * TILE_SIZE;
+    const ROAM_SPEED  = 18;
+
+    e._roamTimer -= dt;
+    if (e._roamTimer <= 0) {
+      const spawnX = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
+      const spawnY = e.spawnTY * TILE_SIZE + TILE_SIZE / 2;
+      const angle  = Math.random() * Math.PI * 2;
+      const dist   = Math.random() * ROAM_RADIUS;
+      e._roamTargetX = spawnX + Math.cos(angle) * dist;
+      e._roamTargetY = spawnY + Math.sin(angle) * dist;
+      e._roamTimer   = 2 + Math.random() * 3;
+    }
+
+    const dx = e._roamTargetX - e._roamX;
+    const dy = e._roamTargetY - e._roamY;
+    const d  = Math.hypot(dx, dy);
+    if (d > 2) {
+      const step = ROAM_SPEED * dt;
+      e._roamX += (dx / d) * Math.min(step, d);
+      e._roamY += (dy / d) * Math.min(step, d);
+    }
   }
 
   _movePlayer(dt) {
@@ -178,8 +220,8 @@ class WorldScene {
       const e = this.enemies[i];
       if (e.defeated) continue;
       if (Network.isEnemyLocked(i)) continue; // another player is fighting it
-      const ex = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
-      const ey = e.spawnTY * TILE_SIZE + TILE_SIZE / 2;
+      const ex = e._roamX;
+      const ey = e._roamY;
       if (Math.hypot(this.px - ex, this.py - ey) < 26) {
         if (this.onBattleStart) this.onBattleStart(e, i);
         break;
@@ -474,8 +516,8 @@ class WorldScene {
       const e = this.enemies[i];
       if (e.defeated) continue;
 
-      const ex = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
-      const ey = e.spawnTY * TILE_SIZE + TILE_SIZE / 2 + 6;
+      const ex = e._roamX;
+      const ey = e._roamY + 6;
       const locked = Network.isEnemyLocked(i);
 
       // Dim locked enemies

@@ -207,7 +207,8 @@ const Network = {
 
   // ── Queries ──────────────────────────────────────────────────────────
   isEnemyLocked(idx)   { return this.lockedEnemies.has(idx); },
-  isEnemyDefeated(idx) { return this.defeatedEnemies.has(idx); },
+  isEnemyDefeated(idx)    { return this.defeatedEnemies.has(idx); },
+  clearEnemyDefeated(idx) { this.defeatedEnemies.delete(idx); },
 
   _send(msg) {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {

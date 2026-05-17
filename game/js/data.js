@@ -125,12 +125,12 @@ const CLASS_DATA = {
 
 // ── ENEMY TYPES ─────────────────────────────────────────────────────
 const ENEMY_TYPES = {
-  Goblin:   { level:  1, baseHP:  35, baseAtk:  7, baseDef:  2, spd:  6, xp:  25, gold:  6, zone: 'easy', color: '#58a040', accent: '#305828' },
-  Wolf:     { level:  3, baseHP:  55, baseAtk: 10, baseDef:  4, spd:  9, xp:  45, gold: 10, zone: 'easy', color: '#7a6a58', accent: '#504030' },
-  Bandit:   { level:  5, baseHP:  70, baseAtk: 14, baseDef:  6, spd:  8, xp:  70, gold: 18, zone: 'mid',  color: '#8a5830', accent: '#402810' },
-  Skeleton: { level:  7, baseHP:  85, baseAtk: 17, baseDef:  8, spd:  7, xp: 100, gold: 24, zone: 'mid',  color: '#d0d0b0', accent: '#a0a080' },
-  Troll:    { level: 10, baseHP: 130, baseAtk: 22, baseDef: 13, spd:  5, xp: 160, gold: 40, zone: 'hard', color: '#588040', accent: '#304820' },
-  Dragon:   { level: 15, baseHP: 210, baseAtk: 32, baseDef: 20, spd:  7, xp: 320, gold: 90, zone: 'hard', color: '#c03020', accent: '#800800' },
+  Goblin:   { level:  1, baseHP:  35, baseAtk:  7, baseDef:  2, spd:  6, xp:  25, gold:  6, zone: 'easy', color: '#58a040', accent: '#305828', respawnTime: 30 },
+  Wolf:     { level:  3, baseHP:  55, baseAtk: 10, baseDef:  4, spd:  9, xp:  45, gold: 10, zone: 'easy', color: '#7a6a58', accent: '#504030', respawnTime: 40 },
+  Bandit:   { level:  5, baseHP:  70, baseAtk: 14, baseDef:  6, spd:  8, xp:  70, gold: 18, zone: 'mid',  color: '#8a5830', accent: '#402810', respawnTime: 45 },
+  Skeleton: { level:  7, baseHP:  85, baseAtk: 17, baseDef:  8, spd:  7, xp: 100, gold: 24, zone: 'mid',  color: '#d0d0b0', accent: '#a0a080', respawnTime: 50 },
+  Troll:    { level: 10, baseHP: 130, baseAtk: 22, baseDef: 13, spd:  5, xp: 160, gold: 40, zone: 'hard', color: '#588040', accent: '#304820', respawnTime: 60 },
+  Dragon:   { level: 15, baseHP: 210, baseAtk: 32, baseDef: 20, spd:  7, xp: 320, gold: 90, zone: 'hard', color: '#c03020', accent: '#800800', respawnTime: 90 },
 };
 
 // ── ENEMY SPAWN LIST ────────────────────────────────────────────────
