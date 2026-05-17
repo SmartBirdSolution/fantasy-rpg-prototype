@@ -239,7 +239,12 @@ class Game {
   // ── BATTLE → WORLD ───────────────────────────────────────────────────
   _endBattle(result) {
     const won = result === 'win';
-    Network.sendBattleEnd(this.currentEnemyIdx, won);
+    Network.sendBattleEnd(
+      this.currentEnemyIdx, won,
+      won ? this.currentEnemy.respawnTime : 0,
+      won ? this.currentEnemy.spawnTX : 0,
+      won ? this.currentEnemy.spawnTY : 0
+    );
 
     UI.fadeOut(() => {
       if (won) {

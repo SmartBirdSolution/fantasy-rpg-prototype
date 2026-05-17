@@ -51,6 +51,19 @@ class WorldScene {
       if (Network.isEnemyDefeated(i)) this.enemies[i].defeated = true;
     }
 
+    Network.onEnemyRespawned = (idx) => {
+      const e = this.enemies[idx];
+      if (!e) return;
+      e.defeated     = false;
+      e.currentHP    = e.maxHP;
+      e._roamX       = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
+      e._roamY       = e.spawnTY * TILE_SIZE + TILE_SIZE / 2;
+      e._roamTargetX = e._roamX;
+      e._roamTargetY = e._roamY;
+      e._roamTimer   = Math.random() * 2;
+      e._respawnTimer = -1;
+    };
+
     window.addEventListener('keydown', this._keyDown);
     window.addEventListener('keyup',   this._keyUp);
     this.canvas.addEventListener('click', this._canvasClick);
@@ -124,21 +137,7 @@ class WorldScene {
       const e = this.enemies[i];
       if (!e.defeated && Network.isEnemyDefeated(i)) e.defeated = true;
 
-      if (e.defeated) {
-        if (e._respawnTimer < 0) e._respawnTimer = e.respawnTime; // start countdown
-        e._respawnTimer -= dt;
-        if (e._respawnTimer <= 0) {
-          e.defeated        = false;
-          e._respawnTimer   = -1;
-          e.currentHP       = e.maxHP;
-          e._roamX          = e.spawnTX * TILE_SIZE + TILE_SIZE / 2;
-          e._roamY          = e.spawnTY * TILE_SIZE + TILE_SIZE / 2;
-          e._roamTargetX    = e._roamX;
-          e._roamTargetY    = e._roamY;
-          e._roamTimer      = Math.random() * 2;
-          Network.clearEnemyDefeated(i);
-        }
-      } else if (!Network.isEnemyLocked(i)) {
+      if (!e.defeated && !Network.isEnemyLocked(i)) {
         this._updateMobRoam(e, dt);
       }
     }

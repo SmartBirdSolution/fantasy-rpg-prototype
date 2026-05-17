@@ -16,6 +16,7 @@ const Network = {
   onPlayersChanged: null, // ()
   onEnemyLocked:    null, // (idx)
   onEnemyUnlocked:  null, // (idx, wasDefeated)
+  onEnemyRespawned: null, // (idx)
   onBattleDenied:   null, // (reason)
   onDuelStart:      null, // ({ sessionId, opponent, yourTurn })
   onDuelAttack:     null, // ({ attackerIsMe, dmg, timedOut, yourTurn, over, won, xpGained })
@@ -92,6 +93,21 @@ const Network = {
         if (this.onEnemyUnlocked) this.onEnemyUnlocked(msg.enemyIdx, msg.defeated);
         break;
 
+      case 'enemy_respawned':
+        this.defeatedEnemies.delete(msg.enemyIdx);
+        if (this.onEnemyRespawned) this.onEnemyRespawned(msg.enemyIdx);
+        break;
+
+      case 'defeated_sync':
+        // Reconcile: any enemy we think is defeated but server says is alive → respawn it
+        for (const idx of [...this.defeatedEnemies]) {
+          if (!msg.defeated.includes(idx)) {
+            this.defeatedEnemies.delete(idx);
+            if (this.onEnemyRespawned) this.onEnemyRespawned(idx);
+          }
+        }
+        break;
+
       case 'battle_denied':
         if (this.onBattleDenied) this.onBattleDenied(msg.reason);
         break;
@@ -160,8 +176,8 @@ const Network = {
     this._send({ type: 'battle_start', enemyIdx });
   },
 
-  sendBattleEnd(enemyIdx, won) {
-    this._send({ type: 'battle_end', enemyIdx, won });
+  sendBattleEnd(enemyIdx, won, respawnTime, spawnTX, spawnTY) {
+    this._send({ type: 'battle_end', enemyIdx, won, respawnTime, spawnTX, spawnTY });
   },
 
   sendDuelQueue(stats) {

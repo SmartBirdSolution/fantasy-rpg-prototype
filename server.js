@@ -49,8 +49,13 @@ const httpServer = http.createServer((req, res) => {
 // ── Game state ────────────────────────────────────────────────────────────────
 let nextId = 1;
 const wsToPlayer = new Map();   // ws → playerState
-const enemyLocks = new Map();   // enemyIdx → playerId  (currently in battle)
-const defeated   = new Set();   // enemyIdx (permanently defeated this session)
+const enemyLocks    = new Map();   // enemyIdx → playerId  (currently in battle)
+const defeated      = new Set();   // enemyIdx (permanently defeated this session)
+const respawnTimers = new Map();   // enemyIdx → setTimeout handle
+
+// Zone-aware respawn constants
+const TILE_PX   = 32;             // must match TILE_SIZE in data.js
+const ZONE_R    = 10 * TILE_PX;   // 10-tile radius — limits enemy_respawned to zone locals
 
 // ── City state ────────────────────────────────────────────────────────────────
 const cityPlayers = new Set();  // player IDs currently inside the city
@@ -110,9 +115,14 @@ function resolveDuelTurn(sid, dmg, timedOut) {
   }
 }
 
+// Coarse 10-tile grid cell — used to detect zone crossings on player move
+function zoneCell(x, y) {
+  return `${Math.floor(x / (TILE_PX * 10))},${Math.floor(y / (TILE_PX * 10))}`;
+}
+
 function makeState(id) {
   return { id, name: `Player${id}`, race: null, cls: null,
-           x: 0, y: 0, scene: 'charselect', fightingEnemy: null };
+           x: 0, y: 0, scene: 'charselect', fightingEnemy: null, _zoneCell: null };
 }
 
 function allOtherStates(excludeId) {
@@ -131,6 +141,17 @@ function broadcast(msg, exceptWs = null) {
 
 function sendTo(ws, msg) {
   if (ws.readyState === 1) ws.send(JSON.stringify(msg));
+}
+
+// Send msg only to world-scene players within ZONE_R pixels of (spawnTX, spawnTY)
+function broadcastToZone(msg, spawnTX, spawnTY) {
+  const cx  = spawnTX * TILE_PX + TILE_PX / 2;
+  const cy  = spawnTY * TILE_PX + TILE_PX / 2;
+  const raw = JSON.stringify(msg);
+  for (const [ws, state] of wsToPlayer) {
+    if (ws.readyState !== 1 || state.scene !== 'world') continue;
+    if (Math.hypot(state.x - cx, state.y - cy) <= ZONE_R) ws.send(raw);
+  }
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -175,6 +196,13 @@ wss.on('connection', ws => {
         state.x     = msg.x     ?? state.x;
         state.y     = msg.y     ?? state.y;
         state.scene = msg.scene ?? state.scene;
+        // Zone crossing — send this player the current defeated list immediately
+        // so they discover any enemies that respawned while they were elsewhere
+        const cell = zoneCell(state.x, state.y);
+        if (cell !== state._zoneCell) {
+          state._zoneCell = cell;
+          sendTo(ws, { type: 'defeated_sync', defeated: [...defeated] });
+        }
         broadcast({ type: 'player_update', player: { id, name: state.name, race: state.race,
           cls: state.cls, x: state.x, y: state.y, scene: state.scene,
           fightingEnemy: state.fightingEnemy } }, ws);
@@ -201,7 +229,24 @@ wss.on('connection', ws => {
         enemyLocks.delete(idx);
         state.fightingEnemy = null;
         state.scene = 'world';
-        if (msg.won) defeated.add(idx);
+        state._zoneCell = null; // force defeated_sync on next move so stale respawns surface immediately
+        if (msg.won) {
+          defeated.add(idx);
+          if (!respawnTimers.has(idx)) {
+            const ms      = Math.min(Math.max((msg.respawnTime || 30), 5), 300) * 1000;
+            const spawnTX = Number(msg.spawnTX) || 0;
+            const spawnTY = Number(msg.spawnTY) || 0;
+            const handle  = setTimeout(() => {
+              defeated.delete(idx);
+              respawnTimers.delete(idx);
+              // Zone-local real-time update for nearby players
+              broadcastToZone({ type: 'enemy_respawned', enemyIdx: idx }, spawnTX, spawnTY);
+              // Full sync for everyone else (in battle, city, or outside zone)
+              broadcast({ type: 'defeated_sync', defeated: [...defeated] });
+            }, ms);
+            respawnTimers.set(idx, handle);
+          }
+        }
         broadcast({ type: 'enemy_unlocked', enemyIdx: idx, defeated: !!msg.won });
         broadcast({ type: 'player_update', player: { id, name: state.name, race: state.race,
           cls: state.cls, x: state.x, y: state.y, scene: 'world', fightingEnemy: null } }, ws);
@@ -436,6 +481,11 @@ wss.on('connection', ws => {
 
   console.log(`  Player ${id} connected  (${wsToPlayer.size} online)`);
 });
+
+// ── Periodic defeated sync — catches clients that missed zone-local respawns ──
+setInterval(() => {
+  broadcast({ type: 'defeated_sync', defeated: [...defeated] });
+}, 60_000);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 httpServer.listen(PORT, '0.0.0.0', () => {
