@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fantasy RPG</title>
-  <link rel="stylesheet" href="css/style.css?v=26">
+  <link rel="stylesheet" href="css/style.css?v=27">
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
@@ -119,6 +119,8 @@
           <div id="inv-equip-section">
             <div class="inv-section-label">EQUIPPED</div>
             <div id="inv-equip-grid"></div>
+            <div class="inv-section-label" style="margin-top:10px">ELIXIR BELT</div>
+            <div id="inv-elixir-grid"></div>
           </div>
           <div id="inv-char-section">
             <canvas id="inv-char-canvas" width="120" height="170"></canvas>
@@ -134,6 +136,7 @@
         <div id="inv-ctx-item-name"></div>
         <button id="inv-ctx-use">Use</button>
         <button id="inv-ctx-wear">Wear</button>
+        <button id="inv-ctx-equip-elixir">Equip (Elixir)</button>
         <button id="inv-ctx-unequip">Unequip</button>
         <button id="inv-ctx-delete">Delete</button>
       </div>
@@ -229,6 +232,8 @@
     <div id="admin-panel-label">ADMIN — TESTING ONLY</div>
     <button id="btn-admin-hp">+50 HP</button>
     <button id="btn-admin-bottle">Add Health Bottle</button>
+    <button id="btn-admin-chainmail">Add Chainmail</button>
+    <button id="btn-admin-belt">Add Leather Belt</button>
     <button id="btn-admin-gold">Add 100 Gold</button>
   </div>
 
@@ -237,12 +242,12 @@
     <div id="effects-list"></div>
   </div>
 
-  <script src="js/data.js?v=26"></script>
-  <script src="js/character.js?v=26"></script>
-  <script src="js/world.js?v=26"></script>
-  <script src="js/battle.js?v=26"></script>
-  <script src="js/ui.js?v=26"></script>
-  <script src="js/network.js?v=26"></script>
-  <script src="js/game.js?v=26"></script>
+  <script src="js/data.js?v=27"></script>
+  <script src="js/character.js?v=27"></script>
+  <script src="js/world.js?v=27"></script>
+  <script src="js/battle.js?v=27"></script>
+  <script src="js/ui.js?v=27"></script>
+  <script src="js/network.js?v=27"></script>
+  <script src="js/game.js?v=27"></script>
 </body>
 </html>

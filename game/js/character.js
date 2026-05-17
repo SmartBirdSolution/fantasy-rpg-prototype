@@ -64,6 +64,7 @@ class PlayerCharacter extends Character {
     this.gold            = 0;
     this.championPoints  = 0;
     this.inventory       = new Array(100).fill(null);
+    this.elixirSlots     = [null, null, null, null]; // 2 default; 2 extra with belt
     this._baseRegen      = CLASS_DATA[charClass].baseRegen;
     this._hotHps         = 0;
     this._hotRemaining   = 0;
@@ -74,6 +75,9 @@ class PlayerCharacter extends Character {
 
   // HP regen per second (used in world loop)
   get regenRate() { return this._baseRegen * 0.5; }
+
+  // Slots 0-1 always available; slots 2-3 require a belt
+  get elixirSlotsAvailable() { return this.equipped.belt ? 4 : 2; }
 
   // Returns true if leveled up
   gainXP(amount) {
@@ -164,6 +168,47 @@ class PlayerCharacter extends Character {
   removeFromInventory(invIdx) {
     if (this.inventory[invIdx]?.slot === 'gold') this.gold = 0;
     this.inventory[invIdx] = null;
+  }
+
+  // Move consumable from inventory to an elixir slot
+  equipElixirSlot(invIdx, slotIdx) {
+    const item = this.inventory[invIdx];
+    if (!item || item.slot !== 'consumable') return false;
+    if (slotIdx >= this.elixirSlotsAvailable) return false;
+    const old = this.elixirSlots[slotIdx];
+    if (old) {
+      const freeIdx = this.inventory.findIndex(s => s === null);
+      if (freeIdx === -1) return false;
+      this.inventory[freeIdx] = old;
+    }
+    this.elixirSlots[slotIdx] = item;
+    this.inventory[invIdx]    = null;
+    return true;
+  }
+
+  // Return elixir slot item back to inventory
+  unequipElixirSlot(slotIdx) {
+    const item = this.elixirSlots[slotIdx];
+    if (!item) return false;
+    if (!this.addToInventory(item)) return false;
+    this.elixirSlots[slotIdx] = null;
+    return true;
+  }
+
+  // Consume and apply the elixir in a slot
+  useElixirSlot(slotIdx) {
+    const item = this.elixirSlots[slotIdx];
+    if (!item) return false;
+    if (item.hotHps) {
+      this._hotHps       = item.hotHps;
+      this._hotRemaining = item.hotDuration;
+    } else if (item.healFraction) {
+      this.currentHP = Math.min(this.maxHP, this.currentHP + Math.round(this.maxHP * item.healFraction));
+    } else if (item.healAmount) {
+      this.currentHP = Math.min(this.maxHP, this.currentHP + item.healAmount);
+    }
+    this.elixirSlots[slotIdx] = null;
+    return true;
   }
 
   draw(ctx, cx, cy, facingRight = true, lungeOffset = 0) {

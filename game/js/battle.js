@@ -253,10 +253,14 @@ class BattleScene {
   }
 
   _rollLoot() {
-    if (Math.random() < 0.25) {
-      return [{ ...EQUIPMENT_TEMPLATES.HealthBottle, id: 'HealthBottle' }];
-    }
-    return [];
+    const drops = [];
+    if (Math.random() < 0.25) drops.push({ ...EQUIPMENT_TEMPLATES.HealthBottle });
+    const zone = ENEMY_TYPES[this.enemy.type]?.zone;
+    if ((zone === 'mid' || zone === 'hard') && Math.random() < 0.12)
+      drops.push({ ...EQUIPMENT_TEMPLATES.Chainmail });
+    if (zone === 'hard' && Math.random() < 0.08)
+      drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
+    return drops;
   }
 
   _spawnFloat(dmg, target) {

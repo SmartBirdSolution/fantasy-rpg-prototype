@@ -41,12 +41,14 @@ const UI = {
 
       // Action bar
       actionBar:      document.getElementById('action-bar'),
-      btnBag:         document.getElementById('btn-bag'),
-      btnAdminToggle: document.getElementById('btn-admin-toggle'),
-      adminPanel:     document.getElementById('admin-panel'),
-      btnAdminHp:     document.getElementById('btn-admin-hp'),
-      btnAdminBottle: document.getElementById('btn-admin-bottle'),
-      btnAdminGold:   document.getElementById('btn-admin-gold'),
+      btnBag:           document.getElementById('btn-bag'),
+      btnAdminToggle:   document.getElementById('btn-admin-toggle'),
+      adminPanel:       document.getElementById('admin-panel'),
+      btnAdminHp:       document.getElementById('btn-admin-hp'),
+      btnAdminBottle:   document.getElementById('btn-admin-bottle'),
+      btnAdminChainmail:document.getElementById('btn-admin-chainmail'),
+      btnAdminBelt:     document.getElementById('btn-admin-belt'),
+      btnAdminGold:     document.getElementById('btn-admin-gold'),
 
       // City
       cityUI:         document.getElementById('city-ui'),
@@ -116,8 +118,17 @@ const UI = {
 
     this._els.btnAdminBottle.onclick = () => {
       if (!player) return;
-      const template = EQUIPMENT_TEMPLATES.HealthBottle;
-      player.addToInventory({ ...template });
+      player.addToInventory({ ...EQUIPMENT_TEMPLATES.HealthBottle });
+    };
+
+    this._els.btnAdminChainmail.onclick = () => {
+      if (!player) return;
+      player.addToInventory({ ...EQUIPMENT_TEMPLATES.Chainmail });
+    };
+
+    this._els.btnAdminBelt.onclick = () => {
+      if (!player) return;
+      player.addToInventory({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
     };
 
     this._els.btnAdminGold.onclick = () => {
@@ -362,6 +373,36 @@ const UI = {
       `<br>HP: ${player.currentHP}/${player.maxHP}` +
       `<br>CP: ${player.championPoints || 0}`;
 
+    // Elixir belt slots
+    const available = player.elixirSlotsAvailable;
+    const elixirGrid = document.getElementById('inv-elixir-grid');
+    elixirGrid.innerHTML = '';
+    for (let i = 0; i < 4; i++) {
+      const item   = player.elixirSlots[i];
+      const locked = i >= available;
+      const el = document.createElement('div');
+      el.className = 'inv-elixir-slot' + (item ? ' has-item' : '') + (locked ? ' locked' : '');
+      el.title = locked ? 'Equip a Belt to unlock this slot' : (item ? item.name : 'Empty elixir slot');
+      el.textContent = locked ? '🔒' : (item ? item.name.slice(0, 4) : (i + 1));
+      if (item && !locked) {
+        el.addEventListener('click', e => {
+          e.stopPropagation();
+          this._showElixirContext(i, e.clientX, e.clientY);
+        });
+      }
+      if (!locked) {
+        el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+        el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+        el.addEventListener('drop', e => {
+          e.preventDefault();
+          el.classList.remove('drag-over');
+          const invIdx = parseInt(e.dataTransfer.getData('invIdx'), 10);
+          if (!isNaN(invIdx)) { player.equipElixirSlot(invIdx, i); this._renderInventory(); }
+        });
+      }
+      elixirGrid.appendChild(el);
+    }
+
     // Inventory grid
     const itemGrid = document.getElementById('inv-item-grid');
     itemGrid.innerHTML = '';
@@ -376,6 +417,10 @@ const UI = {
           e.stopPropagation();
           this._showItemContext(i, e.clientX, e.clientY);
         });
+        if (item.slot === 'consumable') {
+          el.draggable = true;
+          el.addEventListener('dragstart', e => { e.dataTransfer.setData('invIdx', i); });
+        }
       }
       itemGrid.appendChild(el);
     }
@@ -389,11 +434,15 @@ const UI = {
     const menu = document.getElementById('inv-context-menu');
     document.getElementById('inv-ctx-item-name').textContent = item.name;
 
-    const isConsumable = item.slot === 'consumable';
-    const isEquipment  = item.slot !== 'consumable' && item.slot !== 'gold';
-    document.getElementById('inv-ctx-use').style.display     = isConsumable ? '' : 'none';
-    document.getElementById('inv-ctx-wear').style.display    = isEquipment  ? '' : 'none';
-    document.getElementById('inv-ctx-unequip').style.display = 'none';
+    const isConsumable   = item.slot === 'consumable';
+    const isEquipment    = item.slot !== 'consumable' && item.slot !== 'gold';
+    const freeElixirSlot = isConsumable
+      ? player.elixirSlots.slice(0, player.elixirSlotsAvailable).findIndex(s => !s)
+      : -1;
+    document.getElementById('inv-ctx-use').style.display          = isConsumable ? '' : 'none';
+    document.getElementById('inv-ctx-wear').style.display         = isEquipment  ? '' : 'none';
+    document.getElementById('inv-ctx-equip-elixir').style.display = (isConsumable && freeElixirSlot !== -1) ? '' : 'none';
+    document.getElementById('inv-ctx-unequip').style.display      = 'none';
 
     document.getElementById('inv-ctx-use').onclick = () => {
       player.useFromInventory(invIdx);
@@ -402,6 +451,12 @@ const UI = {
     };
     document.getElementById('inv-ctx-wear').onclick = () => {
       player.equipFromInventory(invIdx);
+      menu.style.display = 'none';
+      this._renderInventory();
+    };
+    document.getElementById('inv-ctx-equip-elixir').onclick = () => {
+      const slot = player.elixirSlots.slice(0, player.elixirSlotsAvailable).findIndex(s => !s);
+      if (slot !== -1) player.equipElixirSlot(invIdx, slot);
       menu.style.display = 'none';
       this._renderInventory();
     };
@@ -435,6 +490,39 @@ const UI = {
     document.getElementById('inv-ctx-delete').onclick = () => {
       player.equipped[slot] = null;
       player.currentHP = Math.min(player.currentHP, player.maxHP);
+      menu.style.display = 'none';
+      this._renderInventory();
+    };
+
+    menu.style.left = cx + 4 + 'px';
+    menu.style.top  = cy + 4 + 'px';
+    menu.style.display = 'flex';
+  },
+
+  _showElixirContext(slotIdx, cx, cy) {
+    const player = this._invPlayer;
+    const menu = document.getElementById('inv-context-menu');
+    const item = player.elixirSlots[slotIdx];
+    if (!item) return;
+
+    document.getElementById('inv-ctx-item-name').textContent         = item.name;
+    document.getElementById('inv-ctx-use').style.display             = '';
+    document.getElementById('inv-ctx-wear').style.display            = 'none';
+    document.getElementById('inv-ctx-equip-elixir').style.display    = 'none';
+    document.getElementById('inv-ctx-unequip').style.display         = '';
+
+    document.getElementById('inv-ctx-use').onclick = () => {
+      player.useElixirSlot(slotIdx);
+      menu.style.display = 'none';
+      this._renderInventory();
+    };
+    document.getElementById('inv-ctx-unequip').onclick = () => {
+      player.unequipElixirSlot(slotIdx);
+      menu.style.display = 'none';
+      this._renderInventory();
+    };
+    document.getElementById('inv-ctx-delete').onclick = () => {
+      player.elixirSlots[slotIdx] = null;
       menu.style.display = 'none';
       this._renderInventory();
     };

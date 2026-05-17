@@ -165,6 +165,8 @@ const ENEMY_SPAWNS = [
 // ── ITEMS ────────────────────────────────────────────────────────────
 const EQUIPMENT_TEMPLATES = {
   HealthBottle: { slot: 'consumable', name: 'Health Bottle', hotHps: 5, hotDuration: 5 },
+  Chainmail:    { slot: 'body',       name: 'Chainmail',     defBonus: 5, hpBonus: 15 },
+  LeatherBelt:  { slot: 'belt',       name: 'Leather Belt',  defBonus: 1 },
 };
 
 // ── LEVEL HELPERS ───────────────────────────────────────────────────

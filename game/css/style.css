@@ -651,6 +651,50 @@ body {
 
 .inv-item-slot.has-item:hover { border-color: #5a8aaa; background: #102030; }
 
+/* Elixir belt slots */
+#inv-elixir-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.inv-elixir-slot {
+  aspect-ratio: 1;
+  background: #0a0f1a;
+  border: 1px solid #1a2a4a;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #446;
+  cursor: default;
+  overflow: hidden;
+  text-align: center;
+  padding: 2px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.inv-elixir-slot.has-item {
+  background: #0d1a2c;
+  border-color: #60a060;
+  color: #80d880;
+  cursor: pointer;
+}
+
+.inv-elixir-slot.has-item:hover { border-color: #80d880; background: #0f2418; }
+
+.inv-elixir-slot.locked {
+  opacity: 0.38;
+  cursor: not-allowed;
+  font-size: 11px;
+}
+
+.inv-elixir-slot.drag-over {
+  border-color: #ffd700;
+  background: #1a2a0a;
+}
+
 /* Context menu */
 #inv-context-menu {
   position: fixed;
