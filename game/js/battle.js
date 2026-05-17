@@ -1118,7 +1118,7 @@ class DuelBattleScene {
     this._wheelCenter   = null;
     this.floats         = [];
 
-    this._countdown       = 90;
+    this._countdown       = GAME_CONFIG.DUEL_TURN_SECONDS;
     this._countdownHandle = null;
     this.playerDefending  = false;
 
@@ -1183,7 +1183,7 @@ class DuelBattleScene {
     this.canvas.style.cursor = 'default';
     UI.setDefenseEnabled(false);
     // Show opponent countdown (display-only — server enforces the real timer)
-    this._countdown = 90;
+    this._countdown = GAME_CONFIG.DUEL_TURN_SECONDS;
     clearInterval(this._countdownHandle);
     this._countdownHandle = setInterval(() => {
       this._countdown = Math.max(0, this._countdown - 1);
@@ -1193,7 +1193,7 @@ class DuelBattleScene {
   }
 
   _startCountdown() {
-    this._countdown = 90;
+    this._countdown = GAME_CONFIG.DUEL_TURN_SECONDS;
     clearInterval(this._countdownHandle);
     this._countdownHandle = setInterval(() => {
       this._countdown = Math.max(0, this._countdown - 1);
