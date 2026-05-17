@@ -66,10 +66,9 @@ const duelSessions = new Map();  // sessionId → { p1, p2, activeId, turnTimer 
 let   nextDuelId   = 1;
 const DUEL_TURN_MS = 90_000;
 
-function calcDuelDmg(atk, def, attackerDefending, defenderDefending) {
+function calcDuelDmg(atk, def, defenderDefending) {
   let base = Math.max(1, atk - def * 0.5) * (0.85 + Math.random() * 0.3);
-  if (attackerDefending) base *= 0.5;   // defensive stance reduces outgoing damage
-  if (defenderDefending) base *= 0.5;   // defender's stance reduces incoming damage
+  if (defenderDefending) base *= 0.5;   // only defender's shield reduces incoming damage
   return Math.max(1, Math.round(base));
 }
 
@@ -261,7 +260,7 @@ wss.on('connection', ws => {
         const defKey = myKey === 'p1' ? 'p2' : 'p1';
         const dmg = calcDuelDmg(
           sess[myKey].stats.atk, sess[defKey].stats.def,
-          sess[myKey].defending, sess[defKey].defending
+          sess[defKey].defending
         );
         resolveDuelTurn(sessionId, dmg, false);
         break;
