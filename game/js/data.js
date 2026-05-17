@@ -164,9 +164,26 @@ const ENEMY_SPAWNS = [
 
 // ── ITEMS ────────────────────────────────────────────────────────────
 const EQUIPMENT_TEMPLATES = {
-  HealthBottle: { slot: 'consumable', name: 'Health Bottle', hotHps: 5, hotDuration: 5 },
-  Chainmail:    { slot: 'body',       name: 'Chainmail',     defBonus: 5, hpBonus: 15 },
-  LeatherBelt:  { slot: 'belt',       name: 'Leather Belt',  defBonus: 1 },
+  // Consumables
+  HealthBottle:  { slot: 'consumable', name: 'Health Bottle',   hotHps: 5,   hotDuration: 5 },
+
+  // Weapons
+  IronSword:     { slot: 'mainHand',   name: 'Iron Sword',      atkBonus: 5  },
+  SteelSword:    { slot: 'mainHand',   name: 'Steel Sword',     atkBonus: 11 },
+
+  // Off-hand
+  WoodenShield:  { slot: 'offHand',    name: 'Wooden Shield',   defBonus: 3  },
+  IronShield:    { slot: 'offHand',    name: 'Iron Shield',     defBonus: 6  },
+
+  // Armor
+  LeatherHelm:   { slot: 'helmet',     name: 'Leather Helm',    defBonus: 2  },
+  IronHelm:      { slot: 'helmet',     name: 'Iron Helm',       defBonus: 5  },
+  Chainmail:     { slot: 'body',       name: 'Chainmail',       defBonus: 5, hpBonus: 15 },
+  PlateArmor:    { slot: 'body',       name: 'Plate Armor',     defBonus: 9, hpBonus: 25 },
+  LeatherBoots:  { slot: 'boots',      name: 'Leather Boots',   defBonus: 1  },
+  IronBoots:     { slot: 'boots',      name: 'Iron Boots',      defBonus: 3  },
+  LeatherBelt:   { slot: 'belt',       name: 'Leather Belt',    defBonus: 1  },
+  IronBelt:      { slot: 'belt',       name: 'Iron Belt',       defBonus: 2  },
 };
 
 // ── LEVEL HELPERS ───────────────────────────────────────────────────

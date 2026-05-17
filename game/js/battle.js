@@ -255,11 +255,34 @@ class BattleScene {
   _rollLoot() {
     const drops = [];
     if (Math.random() < 0.25) drops.push({ ...EQUIPMENT_TEMPLATES.HealthBottle });
+
     const zone = ENEMY_TYPES[this.enemy.type]?.zone;
-    if ((zone === 'mid' || zone === 'hard') && Math.random() < 0.12)
-      drops.push({ ...EQUIPMENT_TEMPLATES.Chainmail });
-    if (zone === 'hard' && Math.random() < 0.08)
-      drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
+    // easy zone — basic gear
+    if (zone === 'easy') {
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronSword });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.WoodenShield });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherHelm });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBoots });
+      if (Math.random() < 0.06) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
+    }
+    // mid zone — better gear
+    if (zone === 'mid') {
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronSword });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.WoodenShield });
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronHelm });
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.Chainmail });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.IronBoots });
+      if (Math.random() < 0.06) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
+    }
+    // hard zone — best gear
+    if (zone === 'hard') {
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.SteelSword });
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronShield });
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronHelm });
+      if (Math.random() < 0.12) drops.push({ ...EQUIPMENT_TEMPLATES.PlateArmor });
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronBoots });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.IronBelt });
+    }
     return drops;
   }
 

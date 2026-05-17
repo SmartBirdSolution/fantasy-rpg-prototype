@@ -41,14 +41,18 @@ const UI = {
 
       // Action bar
       actionBar:      document.getElementById('action-bar'),
-      btnBag:           document.getElementById('btn-bag'),
-      btnAdminToggle:   document.getElementById('btn-admin-toggle'),
-      adminPanel:       document.getElementById('admin-panel'),
-      btnAdminHp:       document.getElementById('btn-admin-hp'),
-      btnAdminBottle:   document.getElementById('btn-admin-bottle'),
-      btnAdminChainmail:document.getElementById('btn-admin-chainmail'),
-      btnAdminBelt:     document.getElementById('btn-admin-belt'),
-      btnAdminGold:     document.getElementById('btn-admin-gold'),
+      btnBag:              document.getElementById('btn-bag'),
+      btnAdminToggle:      document.getElementById('btn-admin-toggle'),
+      adminPanel:          document.getElementById('admin-panel'),
+      btnAdminHp:          document.getElementById('btn-admin-hp'),
+      btnAdminBottle:      document.getElementById('btn-admin-bottle'),
+      btnAdminGold:        document.getElementById('btn-admin-gold'),
+      btnAdminIronSword:   document.getElementById('btn-admin-iron-sword'),
+      btnAdminWoodShield:  document.getElementById('btn-admin-wooden-shield'),
+      btnAdminLeathHelm:   document.getElementById('btn-admin-leather-helm'),
+      btnAdminChainmail:   document.getElementById('btn-admin-chainmail'),
+      btnAdminLeathBoots:  document.getElementById('btn-admin-leather-boots'),
+      btnAdminBelt:        document.getElementById('btn-admin-belt'),
 
       // City
       cityUI:         document.getElementById('city-ui'),
@@ -121,15 +125,13 @@ const UI = {
       player.addToInventory({ ...EQUIPMENT_TEMPLATES.HealthBottle });
     };
 
-    this._els.btnAdminChainmail.onclick = () => {
-      if (!player) return;
-      player.addToInventory({ ...EQUIPMENT_TEMPLATES.Chainmail });
-    };
-
-    this._els.btnAdminBelt.onclick = () => {
-      if (!player) return;
-      player.addToInventory({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
-    };
+    const _adminAdd = key => { if (player) player.addToInventory({ ...EQUIPMENT_TEMPLATES[key] }); };
+    this._els.btnAdminIronSword.onclick  = () => _adminAdd('IronSword');
+    this._els.btnAdminWoodShield.onclick = () => _adminAdd('WoodenShield');
+    this._els.btnAdminLeathHelm.onclick  = () => _adminAdd('LeatherHelm');
+    this._els.btnAdminChainmail.onclick  = () => _adminAdd('Chainmail');
+    this._els.btnAdminLeathBoots.onclick = () => _adminAdd('LeatherBoots');
+    this._els.btnAdminBelt.onclick       = () => _adminAdd('LeatherBelt');
 
     this._els.btnAdminGold.onclick = () => {
       if (!player) return;
@@ -477,10 +479,11 @@ const UI = {
     const item = player.equipped[slot];
     if (!item) return;
 
-    document.getElementById('inv-ctx-item-name').textContent = item.name;
-    document.getElementById('inv-ctx-use').style.display    = 'none';
-    document.getElementById('inv-ctx-wear').style.display   = 'none';
-    document.getElementById('inv-ctx-unequip').style.display = '';
+    document.getElementById('inv-ctx-item-name').textContent         = item.name;
+    document.getElementById('inv-ctx-use').style.display             = 'none';
+    document.getElementById('inv-ctx-wear').style.display            = 'none';
+    document.getElementById('inv-ctx-equip-elixir').style.display    = 'none';
+    document.getElementById('inv-ctx-unequip').style.display         = '';
 
     document.getElementById('inv-ctx-unequip').onclick = () => {
       player.unequipSlot(slot);
