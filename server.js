@@ -267,16 +267,14 @@ wss.on('connection', ws => {
         break;
       }
 
-      case 'duel_heal_tick': {
-        const { sessionId, pts, currentHP } = msg;
+      case 'duel_heal': {
+        const { sessionId, total } = msg;
         const sess = duelSessions.get(sessionId);
         if (!sess) break;
-        const myKey = sess.p1.id === id ? 'p1' : sess.p2.id === id ? 'p2' : null;
+        const myKey  = sess.p1.id === id ? 'p1' : sess.p2.id === id ? 'p2' : null;
         if (!myKey) break;
-        // Sync server-side HP so damage calc on next attack uses the healed value
-        sess[myKey].currentHP = Math.min(sess[myKey].stats.maxHP, Math.max(0, currentHP));
         const defKey = myKey === 'p1' ? 'p2' : 'p1';
-        sendTo(sess[defKey].ws, { type: 'duel_heal_tick', sessionId, pts, currentHP: sess[myKey].currentHP });
+        sendTo(sess[defKey].ws, { type: 'duel_heal', sessionId, total });
         break;
       }
 

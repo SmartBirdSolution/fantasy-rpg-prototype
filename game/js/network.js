@@ -20,7 +20,7 @@ const Network = {
   onDuelStart:      null, // ({ sessionId, opponent, yourTurn })
   onDuelAttack:     null, // ({ attackerIsMe, dmg, timedOut, yourTurn, over, won, xpGained })
   onDuelForfeit:    null, // ({ xpGained })
-  onDuelHealTick:   null, // ({ sessionId, pts, currentHP })
+  onDuelHeal:       null, // ({ sessionId, total })
 
   // City callbacks (set by game layer)
   onCityPopulation: null, // (count)
@@ -108,8 +108,8 @@ const Network = {
         if (this.onDuelForfeit) this.onDuelForfeit(msg);
         break;
 
-      case 'duel_heal_tick':
-        if (this.onDuelHealTick) this.onDuelHealTick(msg);
+      case 'duel_heal':
+        if (this.onDuelHeal) this.onDuelHeal(msg);
         break;
 
       case 'trade_request':
@@ -176,8 +176,8 @@ const Network = {
     this._send({ type: 'duel_zone', sessionId, zone, defending: !!defending });
   },
 
-  sendDuelHealTick(sessionId, pts, currentHP) {
-    this._send({ type: 'duel_heal_tick', sessionId, pts, currentHP });
+  sendDuelHeal(sessionId, total) {
+    this._send({ type: 'duel_heal', sessionId, total });
   },
 
   // ── City senders ─────────────────────────────────────────────────────

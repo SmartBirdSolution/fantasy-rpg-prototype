@@ -423,12 +423,8 @@ class Game {
         const pts = Math.floor(this._hotAccum);
         this._hotAccum -= pts;
         this.player.currentHP = Math.min(this.player.maxHP, this.player.currentHP + pts);
-        if (this.scene === 'battle' && this.battleScene) {
-          this.battleScene.spawnHealFloat(pts);
-        } else if (this.scene === 'duel' && this.duelScene) {
-          this.duelScene.spawnHealFloat(pts, 'player');
-          if (Network.connected) Network.sendDuelHealTick(this.duelScene.sessionId, pts, this.player.currentHP);
-        }
+        if (this.scene === 'battle' && this.battleScene) this.battleScene.spawnHealFloat(pts);
+        else if (this.scene === 'duel' && this.duelScene) this.duelScene.spawnHealFloat(pts, 'player');
       }
     } else if (this.player) {
       this._hotAccum = 0;

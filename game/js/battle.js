@@ -1303,7 +1303,7 @@ class DuelBattleScene {
 
     Network.onDuelAttack  = d => this._onAttackResult(d);
     Network.onDuelForfeit = d => this._onForfeit(d);
-    Network.onDuelHealTick = d => { this.opponentCurrentHP = d.currentHP; this.spawnHealFloat(d.pts, 'opponent'); };
+    Network.onDuelHeal    = d => this.spawnHealFloat(d.total, 'opponent');
 
     if (this._firstTurn) {
       this._log('You go first — pick a zone!', 'log-system');
@@ -1321,7 +1321,7 @@ class DuelBattleScene {
     this.canvas.style.cursor = 'default';
     Network.onDuelAttack  = null;
     Network.onDuelForfeit = null;
-    Network.onDuelHealTick = null;
+    Network.onDuelHeal    = null;
   }
 
   toggleDefense() {
@@ -2414,7 +2414,7 @@ class DuelBattleScene {
     if (!item || slotIdx >= this.player.elixirSlotsAvailable) return;
     this.player.useElixirSlot(slotIdx);
     this._log(`You drink ${item.name}! +${item.hotHps} HP/s for ${item.hotDuration}s`, 'log-system');
-    // per-tick heal messages sent from game.js loop, not here
+    if (Network.connected) Network.sendDuelHeal(this.sessionId, item.hotHps * item.hotDuration);
   }
 
   _drawElixirBelt(ctx, W, H) {
