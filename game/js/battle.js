@@ -34,6 +34,7 @@ class BattleScene {
     this.defenseEnabled = false;
     this.hoveredSegment = null;
     this._wheelCenter   = null;
+    this.hoveredElixir  = null;
 
     this.floats  = [];
     this.log     = [];
@@ -102,6 +103,11 @@ class BattleScene {
   _handleClick(e) {
     if (this._ended || this.animState !== 'idle') return;
     const { mx, my } = this._mouseCoords(e);
+    const ei = this._hitElixir(mx, my);
+    if (ei >= 0) {
+      if (this.defenseEnabled) this._useElixir(ei);
+      return;
+    }
     const seg = this._hitWheel(mx, my);
     if (!seg) return;
     if (seg === 'defend') {
@@ -113,6 +119,7 @@ class BattleScene {
     this.zonesActive    = false;
     this.defenseEnabled = false;
     this.hoveredSegment = null;
+    this.hoveredElixir  = null;
     this.canvas.style.cursor = 'default';
     UI.setDefenseEnabled(false);
     UI.setTurnIndicator(false);
@@ -121,6 +128,16 @@ class BattleScene {
 
   _handleMove(e) {
     const { mx, my } = this._mouseCoords(e);
+    const ei = this._hitElixir(mx, my);
+    if (ei >= 0) {
+      this.hoveredElixir  = ei;
+      this.hoveredSegment = null;
+      const item = this.player.elixirSlots[ei];
+      const avail = ei < this.player.elixirSlotsAvailable;
+      this.canvas.style.cursor = (this.defenseEnabled && item && avail) ? 'pointer' : 'default';
+      return;
+    }
+    this.hoveredElixir = null;
     const seg = this._hitWheel(mx, my);
     this.hoveredSegment = seg;
     const interactive = seg === 'defend' ? this.defenseEnabled
@@ -262,6 +279,8 @@ class BattleScene {
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronSword });
       if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.WoodenShield });
       if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherHelm });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherShoulders });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherLegs });
       if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBoots });
       if (Math.random() < 0.06) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
     }
@@ -270,7 +289,9 @@ class BattleScene {
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronSword });
       if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.WoodenShield });
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronHelm });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.IronShoulders });
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.Chainmail });
+      if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.IronLegs });
       if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.IronBoots });
       if (Math.random() < 0.06) drops.push({ ...EQUIPMENT_TEMPLATES.LeatherBelt });
     }
@@ -279,7 +300,9 @@ class BattleScene {
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.SteelSword });
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronShield });
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronHelm });
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronShoulders });
       if (Math.random() < 0.12) drops.push({ ...EQUIPMENT_TEMPLATES.PlateArmor });
+      if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronLegs });
       if (Math.random() < 0.10) drops.push({ ...EQUIPMENT_TEMPLATES.IronBoots });
       if (Math.random() < 0.08) drops.push({ ...EQUIPMENT_TEMPLATES.IronBelt });
     }
@@ -375,11 +398,13 @@ class BattleScene {
 
     if (this.zonesActive || this.defenseEnabled) this._drawWheel(ctx, W, H);
 
-    // Floating damage numbers
+    this._drawElixirBelt(ctx, W, H);
+
+    // Floating damage / heal numbers
     for (const f of this.floats) {
       ctx.globalAlpha = Math.max(0, f.life / f.maxLife);
-      ctx.fillStyle   = '#ff4444';
-      ctx.font        = 'bold 26px monospace';
+      ctx.fillStyle   = f.color || '#ff4444';
+      ctx.font        = f.font  || 'bold 26px monospace';
       ctx.textAlign   = 'center';
       ctx.fillText(f.text, f.x, f.y);
     }
@@ -1119,6 +1144,115 @@ class BattleScene {
     ctx.closePath();
     ctx.fill(); ctx.stroke();
   }
+
+  spawnHealFloat(pts, side = 'player') {
+    const W = this.canvas.width, H = this.canvas.height;
+    const cx = side === 'player' ? W * 0.25 : W * 0.75;
+    this.floats.push({
+      text: `+${pts}`, color: '#44ee88', font: 'bold 20px monospace',
+      x: cx + (Math.random() - 0.5) * 28,
+      y: H * 0.68 - 90, life: 1.5, maxLife: 1.5,
+    });
+  }
+
+  // ── ELIXIR BELT ────────────────────────────────────────────────────
+  _elixirBeltLayout(W, H) {
+    const sw = 44, sh = 30, gap = 5;
+    const total = 4 * sw + 3 * gap;
+    const sx = W * 0.25 - total / 2;
+    const sy = H * 0.68 + 14;
+    return [0, 1, 2, 3].map(i => ({ x: sx + i * (sw + gap), y: sy, w: sw, h: sh, i }));
+  }
+
+  _hitElixir(mx, my) {
+    const W = this.canvas.width, H = this.canvas.height;
+    for (const r of this._elixirBeltLayout(W, H)) {
+      if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) return r.i;
+    }
+    return -1;
+  }
+
+  _useElixir(slotIdx) {
+    const item = this.player.elixirSlots[slotIdx];
+    if (!item || slotIdx >= this.player.elixirSlotsAvailable) return;
+    this.player.useElixirSlot(slotIdx);
+    this._log(`You drink ${item.name}! +${item.hotHps} HP/s for ${item.hotDuration}s`, 'log-system');
+  }
+
+  _drawElixirBelt(ctx, W, H) {
+    const player  = this.player;
+    const rects   = this._elixirBeltLayout(W, H);
+    const avail   = player.elixirSlotsAvailable;
+    const myTurn  = this.defenseEnabled;
+    const pulse   = 0.5 + 0.5 * Math.sin(this._animTime * 3);
+
+    // Panel — action-bar style
+    const bx = rects[0].x - 8,  by = rects[0].y - 17;
+    const bw = rects[3].x + rects[3].w - rects[0].x + 16, bh = rects[0].h + 25;
+
+    ctx.shadowColor = 'rgba(0,0,0,0.70)';
+    ctx.shadowBlur  = 16; ctx.shadowOffsetY = 2;
+    ctx.fillStyle   = 'rgba(5,8,20,0.90)';
+    _roundRect(ctx, bx, by, bw, bh, 8); ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    ctx.strokeStyle = myTurn ? 'rgba(90,138,170,0.70)' : 'rgba(42,58,90,0.80)';
+    ctx.lineWidth   = 1;
+    _roundRect(ctx, bx, by, bw, bh, 8); ctx.stroke();
+
+    ctx.fillStyle = myTurn ? 'rgba(140,188,220,0.80)' : 'rgba(80,110,140,0.55)';
+    ctx.font = '7px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('E L I X I R', bx + bw / 2, by + 11);
+
+    for (const r of rects) {
+      const item   = player.elixirSlots[r.i];
+      const locked = r.i >= avail;
+      const hov    = this.hoveredElixir === r.i && myTurn && item && !locked;
+
+      ctx.save();
+      if (locked) {
+        ctx.fillStyle = 'rgba(8,10,20,0.85)';
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.fill();
+        ctx.strokeStyle = 'rgba(28,32,50,0.80)'; ctx.lineWidth = 1;
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.stroke();
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = '#778'; ctx.font = '10px serif'; ctx.textAlign = 'center';
+        ctx.fillText('🔒', r.x + r.w / 2, r.y + r.h / 2 + 4);
+      } else if (!item) {
+        ctx.fillStyle = 'rgba(10,14,28,0.85)';
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.fill();
+        ctx.strokeStyle = 'rgba(42,58,90,0.55)'; ctx.lineWidth = 1;
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.stroke();
+        ctx.fillStyle = 'rgba(72,92,120,0.50)';
+        ctx.font = '9px monospace'; ctx.textAlign = 'center';
+        ctx.fillText(r.i + 1, r.x + r.w / 2, r.y + r.h / 2 + 3);
+      } else {
+        if (hov) { ctx.shadowColor = 'rgba(90,138,170,0.55)'; ctx.shadowBlur = 10; }
+        ctx.fillStyle = hov ? '#111e30' : '#0d1424';
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.fill();
+        ctx.strokeStyle = hov ? '#5a8aaa' : (myTurn ? 'rgba(90,138,170,0.65)' : 'rgba(42,58,90,0.75)');
+        ctx.lineWidth   = hov ? 1.5 : 1;
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        const icx = r.x + r.w / 2, icy = r.y + 9;
+        ctx.strokeStyle = hov ? '#adf' : (myTurn ? '#8bc' : 'rgba(100,155,195,0.55)');
+        ctx.fillStyle   = hov ? 'rgba(170,220,255,0.15)' : 'rgba(100,155,195,0.12)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(icx, icy, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(icx - 1.5, icy - 4); ctx.lineTo(icx + 1.5, icy - 4);
+        ctx.moveTo(icx, icy - 4);       ctx.lineTo(icx, icy - 7);
+        ctx.stroke();
+
+        ctx.fillStyle = hov ? '#adf' : (myTurn ? '#8bc' : 'rgba(100,155,195,0.55)');
+        ctx.font = '7px monospace'; ctx.textAlign = 'center';
+        const lbl = item.name.replace('Health ', '').slice(0, 6);
+        ctx.fillText(lbl, r.x + r.w / 2, r.y + r.h - 3);
+      }
+      ctx.restore();
+    }
+  }
 }
 
 // ── DUEL BATTLE SCENE (PvP, alternating turns) ──────────────────────────────
@@ -1143,6 +1277,7 @@ class DuelBattleScene {
     this.defenseEnabled = false;
     this.hoveredSegment = null;
     this._wheelCenter   = null;
+    this.hoveredElixir  = null;
     this.floats         = [];
 
     this._countdown       = 90;
@@ -1168,6 +1303,7 @@ class DuelBattleScene {
 
     Network.onDuelAttack  = d => this._onAttackResult(d);
     Network.onDuelForfeit = d => this._onForfeit(d);
+    Network.onDuelHeal    = d => this.spawnHealFloat(d.total, 'opponent');
 
     if (this._firstTurn) {
       this._log('You go first — pick a zone!', 'log-system');
@@ -1185,6 +1321,7 @@ class DuelBattleScene {
     this.canvas.style.cursor = 'default';
     Network.onDuelAttack  = null;
     Network.onDuelForfeit = null;
+    Network.onDuelHeal    = null;
   }
 
   toggleDefense() {
@@ -1275,6 +1412,11 @@ class DuelBattleScene {
   _handleClick(e) {
     if (this._ended || this.animState !== 'idle') return;
     const { mx, my } = this._mouseCoords(e);
+    const ei = this._hitElixir(mx, my);
+    if (ei >= 0) {
+      if (this.defenseEnabled && this.state === 'picking') this._useElixir(ei);
+      return;
+    }
     const seg = this._hitWheel(mx, my);
     if (!seg) return;
     if (seg === 'defend') {
@@ -1287,6 +1429,7 @@ class DuelBattleScene {
     this.zonesActive    = false;
     this.defenseEnabled = false;
     this.hoveredSegment = null;
+    this.hoveredElixir  = null;
     this.canvas.style.cursor = 'default';
     this.state = 'waiting';
     const el = document.getElementById('turn-indicator');
@@ -1296,6 +1439,16 @@ class DuelBattleScene {
 
   _handleMove(e) {
     const { mx, my } = this._mouseCoords(e);
+    const ei = this._hitElixir(mx, my);
+    if (ei >= 0) {
+      this.hoveredElixir  = ei;
+      this.hoveredSegment = null;
+      const item  = this.player.elixirSlots[ei];
+      const avail = ei < this.player.elixirSlotsAvailable;
+      this.canvas.style.cursor = (this.defenseEnabled && this.state === 'picking' && item && avail) ? 'pointer' : 'default';
+      return;
+    }
+    this.hoveredElixir = null;
     const seg = this._hitWheel(mx, my);
     this.hoveredSegment = seg;
     const interactive = seg === 'defend' ? this.defenseEnabled
@@ -1457,6 +1610,8 @@ class DuelBattleScene {
     this._drawZoneLines(ctx, W, H);
     if (this.zonesActive || this.defenseEnabled) this._drawWheel(ctx, W, H);
 
+    this._drawElixirBelt(ctx, W, H);
+
     // Opponent-turn waiting pulse
     if (this.state === 'waiting') {
       const pulse = 0.5 + 0.5 * Math.sin(this._animTime * 3);
@@ -1473,11 +1628,11 @@ class DuelBattleScene {
       ctx.strokeRect(3, 3, W - 6, H - 6);
     }
 
-    // Floating damage numbers
+    // Floating damage / heal numbers
     for (const f of this.floats) {
       ctx.globalAlpha = Math.max(0, f.life / f.maxLife);
-      ctx.fillStyle   = '#ff4444';
-      ctx.font        = 'bold 26px monospace';
+      ctx.fillStyle   = f.color || '#ff4444';
+      ctx.font        = f.font  || 'bold 26px monospace';
       ctx.textAlign   = 'center';
       ctx.fillText(f.text, f.x, f.y);
     }
@@ -2225,5 +2380,114 @@ class DuelBattleScene {
     ctx.lineTo(sx,          sy + sh * 0.42);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
+  }
+
+  spawnHealFloat(pts, side = 'player') {
+    const W = this.canvas.width, H = this.canvas.height;
+    const cx = side === 'player' ? W * 0.25 : W * 0.75;
+    this.floats.push({
+      text: `+${pts}`, color: '#44ee88', font: 'bold 20px monospace',
+      x: cx + (Math.random() - 0.5) * 28,
+      y: H * 0.68 - 90, life: 1.5, maxLife: 1.5,
+    });
+  }
+
+  // ── ELIXIR BELT ────────────────────────────────────────────────────
+  _elixirBeltLayout(W, H) {
+    const sw = 44, sh = 30, gap = 5;
+    const total = 4 * sw + 3 * gap;
+    const sx = W * 0.25 - total / 2;
+    const sy = H * 0.68 + 14;
+    return [0, 1, 2, 3].map(i => ({ x: sx + i * (sw + gap), y: sy, w: sw, h: sh, i }));
+  }
+
+  _hitElixir(mx, my) {
+    const W = this.canvas.width, H = this.canvas.height;
+    for (const r of this._elixirBeltLayout(W, H)) {
+      if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) return r.i;
+    }
+    return -1;
+  }
+
+  _useElixir(slotIdx) {
+    const item = this.player.elixirSlots[slotIdx];
+    if (!item || slotIdx >= this.player.elixirSlotsAvailable) return;
+    this.player.useElixirSlot(slotIdx);
+    this._log(`You drink ${item.name}! +${item.hotHps} HP/s for ${item.hotDuration}s`, 'log-system');
+    if (Network.connected) Network.sendDuelHeal(this.sessionId, item.hotHps * item.hotDuration);
+  }
+
+  _drawElixirBelt(ctx, W, H) {
+    const player  = this.player;
+    const rects   = this._elixirBeltLayout(W, H);
+    const avail   = player.elixirSlotsAvailable;
+    const myTurn  = this.defenseEnabled && this.state === 'picking';
+    const pulse   = 0.5 + 0.5 * Math.sin(this._animTime * 3);
+
+    const bx = rects[0].x - 8,  by = rects[0].y - 17;
+    const bw = rects[3].x + rects[3].w - rects[0].x + 16, bh = rects[0].h + 25;
+
+    ctx.shadowColor = 'rgba(0,0,0,0.70)';
+    ctx.shadowBlur  = 16; ctx.shadowOffsetY = 2;
+    ctx.fillStyle   = 'rgba(5,8,20,0.90)';
+    _roundRect(ctx, bx, by, bw, bh, 8); ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    ctx.strokeStyle = myTurn ? 'rgba(90,138,170,0.70)' : 'rgba(42,58,90,0.80)';
+    ctx.lineWidth   = 1;
+    _roundRect(ctx, bx, by, bw, bh, 8); ctx.stroke();
+
+    ctx.fillStyle = myTurn ? 'rgba(140,188,220,0.80)' : 'rgba(80,110,140,0.55)';
+    ctx.font = '7px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('E L I X I R', bx + bw / 2, by + 11);
+
+    for (const r of rects) {
+      const item   = player.elixirSlots[r.i];
+      const locked = r.i >= avail;
+      const hov    = this.hoveredElixir === r.i && myTurn && item && !locked;
+
+      ctx.save();
+      if (locked) {
+        ctx.fillStyle = 'rgba(8,10,20,0.85)';
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.fill();
+        ctx.strokeStyle = 'rgba(28,32,50,0.80)'; ctx.lineWidth = 1;
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.stroke();
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = '#778'; ctx.font = '10px serif'; ctx.textAlign = 'center';
+        ctx.fillText('🔒', r.x + r.w / 2, r.y + r.h / 2 + 4);
+      } else if (!item) {
+        ctx.fillStyle = 'rgba(10,14,28,0.85)';
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.fill();
+        ctx.strokeStyle = 'rgba(42,58,90,0.55)'; ctx.lineWidth = 1;
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.stroke();
+        ctx.fillStyle = 'rgba(72,92,120,0.50)';
+        ctx.font = '9px monospace'; ctx.textAlign = 'center';
+        ctx.fillText(r.i + 1, r.x + r.w / 2, r.y + r.h / 2 + 3);
+      } else {
+        if (hov) { ctx.shadowColor = 'rgba(90,138,170,0.55)'; ctx.shadowBlur = 10; }
+        ctx.fillStyle = hov ? '#111e30' : '#0d1424';
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.fill();
+        ctx.strokeStyle = hov ? '#5a8aaa' : (myTurn ? 'rgba(90,138,170,0.65)' : 'rgba(42,58,90,0.75)');
+        ctx.lineWidth   = hov ? 1.5 : 1;
+        _roundRect(ctx, r.x, r.y, r.w, r.h, 5); ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        const icx = r.x + r.w / 2, icy = r.y + 9;
+        ctx.strokeStyle = hov ? '#adf' : (myTurn ? '#8bc' : 'rgba(100,155,195,0.55)');
+        ctx.fillStyle   = hov ? 'rgba(170,220,255,0.15)' : 'rgba(100,155,195,0.12)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(icx, icy, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(icx - 1.5, icy - 4); ctx.lineTo(icx + 1.5, icy - 4);
+        ctx.moveTo(icx, icy - 4);       ctx.lineTo(icx, icy - 7);
+        ctx.stroke();
+
+        ctx.fillStyle = hov ? '#adf' : (myTurn ? '#8bc' : 'rgba(100,155,195,0.55)');
+        ctx.font = '7px monospace'; ctx.textAlign = 'center';
+        const lbl = item.name.replace('Health ', '').slice(0, 6);
+        ctx.fillText(lbl, r.x + r.w / 2, r.y + r.h - 3);
+      }
+      ctx.restore();
+    }
   }
 }

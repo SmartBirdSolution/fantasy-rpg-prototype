@@ -695,6 +695,11 @@ body {
   background: #1a2a0a;
 }
 
+.inv-item-slot.drag-over {
+  border-color: #ffd700;
+  background: #1a1a08;
+}
+
 /* Context menu */
 #inv-context-menu {
   position: fixed;

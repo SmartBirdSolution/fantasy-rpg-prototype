@@ -180,10 +180,14 @@ const EQUIPMENT_TEMPLATES = {
   IronHelm:      { slot: 'helmet',     name: 'Iron Helm',       defBonus: 5  },
   Chainmail:     { slot: 'chainmail',   name: 'Chainmail',       defBonus: 5, hpBonus: 15 },
   PlateArmor:    { slot: 'body',       name: 'Plate Armor',     defBonus: 9, hpBonus: 25 },
+  LeatherLegs:   { slot: 'legs',       name: 'Leather Legs',    defBonus: 2  },
+  IronLegs:      { slot: 'legs',       name: 'Iron Legs',       defBonus: 4  },
   LeatherBoots:  { slot: 'boots',      name: 'Leather Boots',   defBonus: 1  },
   IronBoots:     { slot: 'boots',      name: 'Iron Boots',      defBonus: 3  },
   LeatherBelt:   { slot: 'belt',       name: 'Leather Belt',    defBonus: 1  },
   IronBelt:      { slot: 'belt',       name: 'Iron Belt',       defBonus: 2  },
+  LeatherShoulders: { slot: 'shoulders', name: 'Leather Shoulders', defBonus: 2 },
+  IronShoulders:    { slot: 'shoulders', name: 'Iron Shoulders',    defBonus: 4 },
 };
 
 // ── LEVEL HELPERS ───────────────────────────────────────────────────

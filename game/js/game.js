@@ -385,20 +385,6 @@ class Game {
         this._regenAccum = 0;
       }
 
-      // Heal-over-time tick (accumulate to avoid decimal HP display)
-      if (this.player._hotRemaining > 0) {
-        const tick = Math.min(this.player._hotRemaining, dt);
-        this._hotAccum += tick * this.player._hotHps;
-        this.player._hotRemaining = Math.max(0, this.player._hotRemaining - dt);
-        if (this._hotAccum >= 1) {
-          const pts = Math.floor(this._hotAccum);
-          this._hotAccum -= pts;
-          this.player.currentHP = Math.min(this.player.maxHP, this.player.currentHP + pts);
-        }
-      } else {
-        this._hotAccum = 0;
-      }
-
       UI.updateWorldStats(this.player);
 
       // Send position to server at ~20 Hz
@@ -426,6 +412,22 @@ class Game {
     } else if (this.scene === 'charselect') {
       this.ctx.fillStyle = '#05081a';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    // Heal-over-time tick — runs in all scenes (world, battle, duel)
+    if (this.player && this.player._hotRemaining > 0) {
+      const tick = Math.min(this.player._hotRemaining, dt);
+      this._hotAccum += tick * this.player._hotHps;
+      this.player._hotRemaining = Math.max(0, this.player._hotRemaining - dt);
+      if (this._hotAccum >= 1) {
+        const pts = Math.floor(this._hotAccum);
+        this._hotAccum -= pts;
+        this.player.currentHP = Math.min(this.player.maxHP, this.player.currentHP + pts);
+        if (this.scene === 'battle' && this.battleScene) this.battleScene.spawnHealFloat(pts);
+        else if (this.scene === 'duel' && this.duelScene) this.duelScene.spawnHealFloat(pts, 'player');
+      }
+    } else if (this.player) {
+      this._hotAccum = 0;
     }
 
     if (this.player) UI.updateEffectsPanel(this.player);

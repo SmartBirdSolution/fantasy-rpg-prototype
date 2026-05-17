@@ -57,8 +57,12 @@ const UI = {
       btnAdminPlateArmor:  document.getElementById('btn-admin-plate-armor'),
       btnAdminLeathBoots:  document.getElementById('btn-admin-leather-boots'),
       btnAdminIronBoots:   document.getElementById('btn-admin-iron-boots'),
-      btnAdminBelt:        document.getElementById('btn-admin-belt'),
-      btnAdminIronBelt:    document.getElementById('btn-admin-iron-belt'),
+      btnAdminBelt:            document.getElementById('btn-admin-belt'),
+      btnAdminIronBelt:        document.getElementById('btn-admin-iron-belt'),
+      btnAdminLeathShoulders:  document.getElementById('btn-admin-leather-shoulders'),
+      btnAdminIronShoulders:   document.getElementById('btn-admin-iron-shoulders'),
+      btnAdminLeathLegs:       document.getElementById('btn-admin-leather-legs'),
+      btnAdminIronLegs:        document.getElementById('btn-admin-iron-legs'),
 
       // City
       cityUI:         document.getElementById('city-ui'),
@@ -143,8 +147,12 @@ const UI = {
     this._els.btnAdminPlateArmor.onclick = () => _adminAdd('PlateArmor');
     this._els.btnAdminLeathBoots.onclick = () => _adminAdd('LeatherBoots');
     this._els.btnAdminIronBoots.onclick  = () => _adminAdd('IronBoots');
-    this._els.btnAdminBelt.onclick       = () => _adminAdd('LeatherBelt');
-    this._els.btnAdminIronBelt.onclick   = () => _adminAdd('IronBelt');
+    this._els.btnAdminBelt.onclick           = () => _adminAdd('LeatherBelt');
+    this._els.btnAdminIronBelt.onclick       = () => _adminAdd('IronBelt');
+    this._els.btnAdminLeathShoulders.onclick = () => _adminAdd('LeatherShoulders');
+    this._els.btnAdminIronShoulders.onclick  = () => _adminAdd('IronShoulders');
+    this._els.btnAdminLeathLegs.onclick      = () => _adminAdd('LeatherLegs');
+    this._els.btnAdminIronLegs.onclick       = () => _adminAdd('IronLegs');
 
     this._els.btnAdminGold.onclick = () => {
       if (!player) return;
@@ -462,6 +470,26 @@ const UI = {
           el.addEventListener('dragend',   () => { this._dragInvIdx = null; });
         }
       }
+      // Bag-to-bag drop target
+      el.addEventListener('dragover', e => {
+        if (this._dragInvIdx != null && this._dragInvIdx !== i) {
+          const dragged = player.inventory[this._dragInvIdx];
+          if (dragged && dragged.slot !== 'gold') { e.preventDefault(); el.classList.add('drag-over'); }
+        }
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        const from = this._dragInvIdx;
+        if (from == null || from === i) return;
+        // Swap the two slots
+        const tmp = player.inventory[i];
+        player.inventory[i]    = player.inventory[from];
+        player.inventory[from] = tmp;
+        this._dragInvIdx = null;
+        this._renderInventory();
+      });
       itemGrid.appendChild(el);
     }
   },
