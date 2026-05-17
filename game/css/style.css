@@ -1286,47 +1286,86 @@ body {
   bottom: 72px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(10, 6, 2, 0.97);
+  background: rgba(8, 5, 2, 0.98);
   border: 1px solid #7a4a1a;
-  border-radius: 8px;
-  padding: 10px 14px 12px;
+  border-radius: 10px;
+  padding: 14px 18px 16px;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  min-width: 190px;
+  gap: 0;
+  min-width: 340px;
   z-index: 51;
   pointer-events: auto;
-  box-shadow: 0 0 22px rgba(180,100,30,0.3);
+  box-shadow: 0 0 32px rgba(180,100,30,0.35), inset 0 1px 0 rgba(200,130,60,0.15);
 }
 
 #admin-panel-label {
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: #a06030;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #b07040;
   text-align: center;
-  margin-bottom: 4px;
-  padding-bottom: 6px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
   border-bottom: 1px solid #3a2010;
-  white-space: nowrap;
 }
 
+/* General row — 3 equal buttons */
+.admin-general-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.admin-divider {
+  height: 1px;
+  background: #2a1808;
+  margin-bottom: 10px;
+}
+
+/* Two-column gear section */
+.admin-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.admin-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-cat {
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: #7a5030;
+  text-transform: uppercase;
+  margin-top: 8px;
+  margin-bottom: 2px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #251508;
+}
+
+.admin-col .admin-cat:first-child { margin-top: 0; }
+
 #admin-panel button {
-  padding: 7px 12px;
-  background: #120a04;
-  border: 1px solid #4a2a0a;
+  padding: 6px 10px;
+  background: #100806;
+  border: 1px solid #3a2008;
   border-radius: 5px;
-  color: #c87040;
+  color: #b86830;
   font-family: inherit;
   font-size: 10px;
   letter-spacing: 1px;
   cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  text-align: center;
+  width: 100%;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
 
 #admin-panel button:hover {
   border-color: #c07030;
   color: #f0b060;
-  background: #1e0e04;
+  background: #1c0e04;
 }
