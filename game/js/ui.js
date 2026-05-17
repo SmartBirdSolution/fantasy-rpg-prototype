@@ -48,11 +48,17 @@ const UI = {
       btnAdminBottle:      document.getElementById('btn-admin-bottle'),
       btnAdminGold:        document.getElementById('btn-admin-gold'),
       btnAdminIronSword:   document.getElementById('btn-admin-iron-sword'),
+      btnAdminSteelSword:  document.getElementById('btn-admin-steel-sword'),
       btnAdminWoodShield:  document.getElementById('btn-admin-wooden-shield'),
+      btnAdminIronShield:  document.getElementById('btn-admin-iron-shield'),
       btnAdminLeathHelm:   document.getElementById('btn-admin-leather-helm'),
+      btnAdminIronHelm:    document.getElementById('btn-admin-iron-helm'),
       btnAdminChainmail:   document.getElementById('btn-admin-chainmail'),
+      btnAdminPlateArmor:  document.getElementById('btn-admin-plate-armor'),
       btnAdminLeathBoots:  document.getElementById('btn-admin-leather-boots'),
+      btnAdminIronBoots:   document.getElementById('btn-admin-iron-boots'),
       btnAdminBelt:        document.getElementById('btn-admin-belt'),
+      btnAdminIronBelt:    document.getElementById('btn-admin-iron-belt'),
 
       // City
       cityUI:         document.getElementById('city-ui'),
@@ -127,11 +133,17 @@ const UI = {
 
     const _adminAdd = key => { if (player) player.addToInventory({ ...EQUIPMENT_TEMPLATES[key] }); };
     this._els.btnAdminIronSword.onclick  = () => _adminAdd('IronSword');
+    this._els.btnAdminSteelSword.onclick = () => _adminAdd('SteelSword');
     this._els.btnAdminWoodShield.onclick = () => _adminAdd('WoodenShield');
+    this._els.btnAdminIronShield.onclick = () => _adminAdd('IronShield');
     this._els.btnAdminLeathHelm.onclick  = () => _adminAdd('LeatherHelm');
+    this._els.btnAdminIronHelm.onclick   = () => _adminAdd('IronHelm');
     this._els.btnAdminChainmail.onclick  = () => _adminAdd('Chainmail');
+    this._els.btnAdminPlateArmor.onclick = () => _adminAdd('PlateArmor');
     this._els.btnAdminLeathBoots.onclick = () => _adminAdd('LeatherBoots');
+    this._els.btnAdminIronBoots.onclick  = () => _adminAdd('IronBoots');
     this._els.btnAdminBelt.onclick       = () => _adminAdd('LeatherBelt');
+    this._els.btnAdminIronBelt.onclick   = () => _adminAdd('IronBelt');
 
     this._els.btnAdminGold.onclick = () => {
       if (!player) return;
