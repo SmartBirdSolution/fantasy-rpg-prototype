@@ -87,6 +87,7 @@ const UI = {
     this._els.battleUI.style.display      = name === 'battle'     ? '' : 'none';
     this._els.cityUI.style.display        = name === 'city'       ? '' : 'none';
     this._els.cityPrompt.style.display    = 'none'; // always close prompt on scene change
+    this._els.btnDuel.style.display       = name === 'city'       ? '' : 'none';
 
     // Action bar is only visible in the world scene
     if (name === 'world') {
