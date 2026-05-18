@@ -28,8 +28,13 @@ function _initSchema(db) {
       id            TEXT PRIMARY KEY,
       username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
       password_hash TEXT NOT NULL,
+      is_admin      INTEGER DEFAULT 0,
       created_at    TEXT DEFAULT (datetime('now'))
     );
+  `);
+  // Migrate existing databases that predate the is_admin column
+  try { db.exec('ALTER TABLE accounts ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
+  db.exec(`
 
     CREATE TABLE IF NOT EXISTS players (
       uuid             TEXT PRIMARY KEY,
@@ -231,11 +236,11 @@ function loginAccount(username, password) {
   if (typeof username !== 'string' || !username.trim()) throw new Error('Username is required');
   if (typeof password !== 'string' || !password)        throw new Error('Password is required');
   const bcrypt = require('bcryptjs');
-  const row    = getDB().prepare('SELECT id, password_hash FROM accounts WHERE username = ? COLLATE NOCASE').get(username.trim());
+  const row    = getDB().prepare('SELECT id, password_hash, is_admin FROM accounts WHERE username = ? COLLATE NOCASE').get(username.trim());
   if (!row || !bcrypt.compareSync(password, row.password_hash)) {
     throw new Error('Invalid username or password');
   }
-  return row.id;
+  return { id: row.id, isAdmin: row.is_admin === 1 };
 }
 
 module.exports = { loadPlayer, savePlayer, registerAccount, loginAccount, getDB };

@@ -57,7 +57,7 @@ const httpServer = http.createServer((req, res) => {
         const { username, password } = JSON.parse(body);
         const uuid = db.registerAccount(username, password);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ uuid }));
+        res.end(JSON.stringify({ uuid, isAdmin: false }));
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
@@ -73,9 +73,9 @@ const httpServer = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const { username, password } = JSON.parse(body);
-        const uuid = db.loginAccount(username, password);
+        const { id: uuid, isAdmin } = db.loginAccount(username, password);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ uuid }));
+        res.end(JSON.stringify({ uuid, isAdmin }));
       } catch (e) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));

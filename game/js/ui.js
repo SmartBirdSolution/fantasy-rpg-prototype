@@ -137,9 +137,13 @@ const UI = {
   },
 
   // ── ACTION BAR ────────────────────────────────────────────────────
-  initActionBar(player, onOpenInventory) {
+  initActionBar(player, onOpenInventory, isAdmin) {
     this._els.btnBag.onclick     = () => { if (onOpenInventory) onOpenInventory(); };
     this._els.btnProfile.onclick = () => this.openProfile(player);
+
+    if (!isAdmin) {
+      this._els.btnAdminToggle.style.display = 'none';
+    }
 
     this._els.btnAdminToggle.onclick = () => {
       this._toggleAdminPanel();

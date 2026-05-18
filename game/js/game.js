@@ -24,6 +24,8 @@ class Game {
     this._tradeSession    = null; // { sessionId, peerId, peerName, isSender }
     this._tradePendingId  = null; // peerId we sent a request to, before session exists
     this._tradePendingName = null;
+
+    this._isAdmin = false;
   }
 
   start() {
@@ -44,18 +46,21 @@ class Game {
         this._savePlayer();
         localStorage.removeItem('rpg_account_uuid');
         localStorage.removeItem('rpg_username');
+        localStorage.removeItem('rpg_is_admin');
         window.location.reload();
       };
     }
 
     if (window.location.protocol === 'file:') {
       // Single-player / offline: skip auth, use local UUID
-      this._uuid = this._getOrCreateUUID();
+      this._uuid    = this._getOrCreateUUID();
+      this._isAdmin = false;
       this._showCharSelect();
     } else {
       const savedUUID = localStorage.getItem('rpg_account_uuid');
       if (savedUUID) {
-        this._uuid = savedUUID;
+        this._uuid    = savedUUID;
+        this._isAdmin = localStorage.getItem('rpg_is_admin') === '1';
         this._showCharSelect();
       } else {
         UI.showScene('auth');
@@ -132,7 +137,9 @@ class Game {
 
       localStorage.setItem('rpg_account_uuid', json.uuid);
       localStorage.setItem('rpg_username', username);
-      this._uuid = json.uuid;
+      localStorage.setItem('rpg_is_admin', json.isAdmin ? '1' : '0');
+      this._uuid    = json.uuid;
+      this._isAdmin = json.isAdmin === true;
       this._showCharSelect();
 
     } catch {
@@ -294,7 +301,7 @@ class Game {
 
     UI.initActionBar(this.player, () => {
       if (this.scene === 'world') UI.openInventory(this.player);
-    });
+    }, this._isAdmin);
 
     UI.fadeOut(() => {
       UI.showScene('world');
