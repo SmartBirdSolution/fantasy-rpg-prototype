@@ -355,7 +355,8 @@ class BattleScene {
     if (buf.length > combo.sequence.length) buf.splice(0, buf.length - combo.sequence.length);
     if (buf.length < combo.sequence.length) return;
     if (!combo.sequence.every((z, i) => z === buf[i])) return;
-    // Combo matched!
+    // Combo matched! Clear buffer so next hit starts fresh.
+    buf.length = 0;
     if (!combo.discovered) {
       combo.discovered = true;
       this._log(`✦ Discovered: ${combo.name}!`, 'log-loot');
@@ -1419,9 +1420,14 @@ class DuelBattleScene {
     };
     Network.onExtraCrit = ({ sessionId, dmg }) => {
       if (sessionId !== this.sessionId || this._ended) return;
-      this.player.currentHP = Math.max(0, this.player.currentHP - dmg);
-      this._spawnFloat(dmg, 'player');
-      this._log(`✦ ${this.opponent.name} used Fear Move! +${dmg} extra damage!`, 'log-system');
+      this.animState   = 'enemyAtk';
+      this.animT       = 0;
+      this._onAnimDone = () => {
+        this.player.currentHP = Math.max(0, this.player.currentHP - dmg);
+        this._spawnFloat(dmg, 'player');
+        this._log(`✦ ${this.opponent.name} used Fear Move! +${dmg} extra damage!`, 'log-system');
+        this.animState = 'idle';
+      };
     };
 
     if (this._firstTurn) {
@@ -1693,6 +1699,8 @@ class DuelBattleScene {
     if (buf.length > combo.sequence.length) buf.splice(0, buf.length - combo.sequence.length);
     if (buf.length < combo.sequence.length) return;
     if (!combo.sequence.every((z, i) => z === buf[i])) return;
+    // Combo matched! Clear buffer so next hit starts fresh.
+    buf.length = 0;
     if (!combo.discovered) {
       combo.discovered = true;
       this._log(`✦ Discovered: ${combo.name}!`, 'log-loot');
