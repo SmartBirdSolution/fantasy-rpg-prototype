@@ -24,6 +24,13 @@ function getDB() {
 
 function _initSchema(db) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id            TEXT PRIMARY KEY,
+      username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      created_at    TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS players (
       uuid             TEXT PRIMARY KEY,
       name             TEXT NOT NULL,
@@ -201,4 +208,34 @@ function savePlayer(uuid, d) {
   })();
 }
 
-module.exports = { loadPlayer, savePlayer, getDB };
+function registerAccount(username, password) {
+  if (typeof username !== 'string' || !/^[a-zA-Z0-9_\-]{3,32}$/.test(username)) {
+    throw new Error('Username must be 3–32 characters (letters, numbers, _ -)');
+  }
+  if (typeof password !== 'string' || password.length < 6) {
+    throw new Error('Password must be at least 6 characters');
+  }
+  const bcrypt = require('bcryptjs');
+  const hash   = bcrypt.hashSync(password, 10);
+  const id     = require('crypto').randomUUID();
+  try {
+    getDB().prepare('INSERT INTO accounts (id, username, password_hash) VALUES (?,?,?)').run(id, username, hash);
+  } catch (e) {
+    if (e.message.includes('UNIQUE')) throw new Error('Username already taken');
+    throw e;
+  }
+  return id;
+}
+
+function loginAccount(username, password) {
+  if (typeof username !== 'string' || !username.trim()) throw new Error('Username is required');
+  if (typeof password !== 'string' || !password)        throw new Error('Password is required');
+  const bcrypt = require('bcryptjs');
+  const row    = getDB().prepare('SELECT id, password_hash FROM accounts WHERE username = ? COLLATE NOCASE').get(username.trim());
+  if (!row || !bcrypt.compareSync(password, row.password_hash)) {
+    throw new Error('Invalid username or password');
+  }
+  return row.id;
+}
+
+module.exports = { loadPlayer, savePlayer, registerAccount, loginAccount, getDB };

@@ -5,6 +5,7 @@ const UI = {
 
   init() {
     this._els = {
+      authUI:        document.getElementById('auth-ui'),
       charSelectUI:  document.getElementById('char-select-ui'),
       worldUI:       document.getElementById('world-ui'),
       battleUI:      document.getElementById('battle-ui'),
@@ -116,7 +117,8 @@ const UI = {
   },
 
   // ── SCENE MANAGEMENT ──────────────────────────────────────────────
-  showScene(name) { // 'charselect' | 'world' | 'battle' | 'city'
+  showScene(name) { // 'auth' | 'charselect' | 'world' | 'battle' | 'city'
+    if (this._els.authUI) this._els.authUI.style.display = name === 'auth' ? '' : 'none';
     this._els.charSelectUI.style.display  = name === 'charselect' ? '' : 'none';
     this._els.worldUI.style.display       = name === 'world'      ? '' : 'none';
     this._els.battleUI.style.display      = name === 'battle'     ? '' : 'none';

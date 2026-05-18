@@ -48,6 +48,42 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
+  // POST /auth/register
+  if (req.method === 'POST' && urlPath === '/auth/register') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; if (body.length > 4096) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const { username, password } = JSON.parse(body);
+        const uuid = db.registerAccount(username, password);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ uuid }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // POST /auth/login
+  if (req.method === 'POST' && urlPath === '/auth/login') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; if (body.length > 4096) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const { username, password } = JSON.parse(body);
+        const uuid = db.loginAccount(username, password);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ uuid }));
+      } catch (e) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   let filePath = urlPath === '/' ? '/index.html' : urlPath;
   filePath = path.resolve(GAME_DIR, '.' + filePath);
 

@@ -36,10 +36,111 @@ class Game {
     this._initTradeNetwork();
 
     UI.init();
-    UI.showScene('charselect');
-    UI.buildCharSelect((race, cls) => this._onCharSelected(race, cls));
+
+    // Wire LOGOUT button (hidden in file:// mode via CSS; only appears in world)
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+      btnLogout.onclick = () => {
+        this._savePlayer();
+        localStorage.removeItem('rpg_account_uuid');
+        localStorage.removeItem('rpg_username');
+        window.location.reload();
+      };
+    }
+
+    if (window.location.protocol === 'file:') {
+      // Single-player / offline: skip auth, use local UUID
+      this._uuid = this._getOrCreateUUID();
+      this._showCharSelect();
+    } else {
+      const savedUUID = localStorage.getItem('rpg_account_uuid');
+      if (savedUUID) {
+        this._uuid = savedUUID;
+        this._showCharSelect();
+      } else {
+        UI.showScene('auth');
+        this._initAuthHandlers();
+      }
+    }
 
     requestAnimationFrame(ts => this._loop(ts));
+  }
+
+  _showCharSelect() {
+    UI.showScene('charselect');
+    UI.buildCharSelect((race, cls) => this._onCharSelected(race, cls));
+  }
+
+  _initAuthHandlers() {
+    const tabLogin    = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const authSubmit  = document.getElementById('auth-submit');
+    const errorEl     = document.getElementById('auth-error');
+    let   mode        = 'login';
+
+    tabLogin.onclick = () => {
+      mode = 'login';
+      tabLogin.classList.add('active-tab');
+      tabRegister.classList.remove('active-tab');
+      authSubmit.textContent = 'LOGIN';
+      errorEl.style.display = 'none';
+    };
+
+    tabRegister.onclick = () => {
+      mode = 'register';
+      tabRegister.classList.add('active-tab');
+      tabLogin.classList.remove('active-tab');
+      authSubmit.textContent = 'REGISTER';
+      errorEl.style.display = 'none';
+    };
+
+    authSubmit.onclick = () => this._doAuth(mode);
+
+    document.getElementById('auth-username').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('auth-password').focus();
+    });
+    document.getElementById('auth-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') this._doAuth(mode);
+    });
+  }
+
+  async _doAuth(mode) {
+    const username  = document.getElementById('auth-username').value.trim();
+    const password  = document.getElementById('auth-password').value;
+    const errorEl   = document.getElementById('auth-error');
+    const submitEl  = document.getElementById('auth-submit');
+
+    errorEl.style.display = 'none';
+    submitEl.disabled     = true;
+    submitEl.textContent  = mode === 'login' ? 'LOGGING IN...' : 'REGISTERING...';
+
+    try {
+      const res  = await fetch(`/auth/${mode}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, password }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || json.error) {
+        errorEl.textContent   = json.error || 'Server error';
+        errorEl.style.display = 'block';
+        submitEl.disabled     = false;
+        submitEl.textContent  = mode === 'login' ? 'LOGIN' : 'REGISTER';
+        return;
+      }
+
+      localStorage.setItem('rpg_account_uuid', json.uuid);
+      localStorage.setItem('rpg_username', username);
+      this._uuid = json.uuid;
+      this._showCharSelect();
+
+    } catch {
+      errorEl.textContent   = 'Connection error — is the server running?';
+      errorEl.style.display = 'block';
+      submitEl.disabled     = false;
+      submitEl.textContent  = mode === 'login' ? 'LOGIN' : 'REGISTER';
+    }
   }
 
   _resize() {
@@ -148,7 +249,6 @@ class Game {
   }
 
   _onCharSelected(race, cls) {
-    this._uuid  = this._getOrCreateUUID();
     this.player = new PlayerCharacter(race, cls);
 
     Network.onPlayerLoad = (saved) => this._applyPlayerLoad(saved);
@@ -182,10 +282,12 @@ class Game {
       if (this.scene === 'city') this._leaveCity();
     });
 
-    // Hide DUEL button in single-player (file://) mode
-    const btnDuel = document.getElementById('btn-duel');
+    // Hide DUEL and LOGOUT buttons in single-player (file://) mode
+    const btnDuel   = document.getElementById('btn-duel');
+    const btnLogout2 = document.getElementById('btn-logout');
     if (window.location.protocol === 'file:') {
       btnDuel.style.display = 'none';
+      if (btnLogout2) btnLogout2.style.display = 'none';
     } else {
       btnDuel.addEventListener('click', () => this._enterDuelQueue());
     }

@@ -4,12 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fantasy RPG</title>
-  <link rel="stylesheet" href="css/style.css?v=49">
+  <link rel="stylesheet" href="css/style.css?v=50">
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
 
   <div id="ui-overlay">
+
+    <!-- AUTH UI -->
+    <div id="auth-ui" class="scene-ui" style="display:none">
+      <h1>FANTASY RPG</h1>
+      <p class="subtitle">Enter the realm</p>
+      <div id="auth-tabs">
+        <button id="tab-login" class="auth-tab active-tab">LOGIN</button>
+        <button id="tab-register" class="auth-tab">REGISTER</button>
+      </div>
+      <div id="auth-form-wrap">
+        <input id="auth-username" type="text" placeholder="Username" maxlength="32" autocomplete="username">
+        <input id="auth-password" type="password" placeholder="Password" maxlength="64" autocomplete="current-password">
+        <div id="auth-error"></div>
+        <button id="auth-submit">LOGIN</button>
+      </div>
+    </div>
 
     <!-- CHARACTER SELECT -->
     <div id="char-select-ui" class="scene-ui">
@@ -226,6 +242,7 @@
     <button id="btn-bag">BAG</button>
     <button id="btn-profile">PROFILE</button>
     <button id="btn-admin-toggle">ADMIN</button>
+    <button id="btn-logout">LOGOUT</button>
   </div>
 
   <!-- COMBO BAR (battle scene only) -->
@@ -309,12 +326,12 @@
     <div id="effects-list"></div>
   </div>
 
-  <script src="js/data.js?v=49"></script>
-  <script src="js/character.js?v=49"></script>
-  <script src="js/world.js?v=49"></script>
-  <script src="js/battle.js?v=49"></script>
-  <script src="js/ui.js?v=49"></script>
-  <script src="js/network.js?v=49"></script>
-  <script src="js/game.js?v=49"></script>
+  <script src="js/data.js?v=50"></script>
+  <script src="js/character.js?v=50"></script>
+  <script src="js/world.js?v=50"></script>
+  <script src="js/battle.js?v=50"></script>
+  <script src="js/ui.js?v=50"></script>
+  <script src="js/network.js?v=50"></script>
+  <script src="js/game.js?v=50"></script>
 </body>
 </html>
