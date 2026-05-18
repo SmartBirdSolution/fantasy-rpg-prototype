@@ -107,6 +107,9 @@ class Game {
     document.getElementById('auth-password').addEventListener('keydown', e => {
       if (e.key === 'Enter') this._doAuth(mode);
     });
+
+    // Guest / no-login path — _uuid stays undefined, saves are skipped
+    document.getElementById('btn-guest').onclick = () => this._showCharSelect();
   }
 
   async _doAuth(mode) {
