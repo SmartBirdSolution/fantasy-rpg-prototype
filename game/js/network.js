@@ -10,6 +10,7 @@ const Network = {
   defeatedEnemies: new Set(), // enemy indices permanently defeated this session
 
   cityPopulation: 0,          // live count of players inside any city (updated for all players)
+  _pendingMessages: [],       // queued while socket is still CONNECTING
 
   // Set by game layer to react to server events
   onReady:          null, // ()
@@ -57,7 +58,12 @@ const Network = {
       return;
     }
 
-    this.socket.onopen  = () => { this.connected = true; };
+    this.socket.onopen  = () => {
+      this.connected = true;
+      // Flush messages queued while the socket was still connecting
+      for (const raw of this._pendingMessages) this.socket.send(raw);
+      this._pendingMessages = [];
+    };
     this.socket.onclose = () => { this.connected = false; };
     this.socket.onerror = () => {};
     this.socket.onmessage = ev => {
@@ -280,8 +286,12 @@ const Network = {
   clearEnemyDefeated(idx) { this.defeatedEnemies.delete(idx); },
 
   _send(msg) {
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(msg));
+    if (!this.socket) return;
+    const raw = JSON.stringify(msg);
+    if (this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(raw);
+    } else if (this.socket.readyState === WebSocket.CONNECTING) {
+      this._pendingMessages.push(raw);
     }
   },
 };

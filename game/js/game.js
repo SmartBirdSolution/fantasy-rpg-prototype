@@ -26,12 +26,16 @@ class Game {
     this._tradePendingName = null;
 
     this._isAdmin = false;
+    this._autosaveTimer = 0;
   }
 
   start() {
     this._resize();
     window.addEventListener('resize', () => this._resize());
     window.addEventListener('beforeunload', () => this._savePlayer());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this._savePlayer();
+    });
 
     Network.connect();
     Network.onDuelStart = data => this._onDuelStart(data);
@@ -226,8 +230,8 @@ class Game {
       currentHP:      p.currentHP,
       gold:           p.gold,
       championPoints: p.championPoints,
-      worldTileX:     p.worldTileX,
-      worldTileY:     p.worldTileY,
+      worldTileX:     this.worldScene ? Math.floor(this.worldScene.px / TILE_SIZE) : p.worldTileX,
+      worldTileY:     this.worldScene ? Math.floor(this.worldScene.py / TILE_SIZE) : p.worldTileY,
       inventory:      p.inventory,
       elixirSlots:    p.elixirSlots,
       equipped:       p.equipped,
@@ -701,6 +705,13 @@ class Game {
     }
 
     if (this.player) UI.updateEffectsPanel(this.player);
+
+    // Periodic autosave every 60 s — catches admin-added items and other non-battle events
+    this._autosaveTimer += dt;
+    if (this._autosaveTimer >= 60) {
+      this._autosaveTimer = 0;
+      this._savePlayer();
+    }
 
     requestAnimationFrame(nts => this._loop(nts));
   }
