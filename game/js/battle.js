@@ -1380,6 +1380,8 @@ class DuelBattleScene {
     this._pendingExtraCrit = 0;
     this._comboFlashT      = 0;
     this._comboJumpT       = 0;
+    this._oppComboJumpT    = 0;
+    this._oppComboFlashT   = 0;
     this._lastSentZone     = null;
 
     this.onDuelEnd = null;
@@ -1406,6 +1408,8 @@ class DuelBattleScene {
     Network.onDuelForfeit = d => this._onForfeit(d);
     Network.onComboHeal   = ({ sessionId, total }) => {
       if (sessionId !== this.sessionId || this._ended) return;
+      this._oppComboJumpT  = 1.0;
+      this._oppComboFlashT = 1.0;
       this.opponentCurrentHP = Math.min(this.opponent.maxHP, this.opponentCurrentHP + total);
       this.spawnHealFloat(total, 'opponent');
       this._log(`✦ ${this.opponent.name} used Combination! +${total} HP`, 'log-system');
@@ -1420,8 +1424,10 @@ class DuelBattleScene {
     };
     Network.onExtraCrit = ({ sessionId, dmg }) => {
       if (sessionId !== this.sessionId || this._ended) return;
-      this.animState   = 'enemyAtk';
-      this.animT       = 0;
+      this.animState       = 'enemyAtk';
+      this.animT           = 0;
+      this._oppComboJumpT  = 1.0;
+      this._oppComboFlashT = 1.0;
       this._onAnimDone = () => {
         this.player.currentHP = Math.max(0, this.player.currentHP - dmg);
         this._spawnFloat(dmg, 'player');
@@ -1748,8 +1754,10 @@ class DuelBattleScene {
   // ── UPDATE ─────────────────────────────────────────────────────────
   update(dt) {
     this._animTime += dt;
-    if (this._comboFlashT > 0) this._comboFlashT = Math.max(0, this._comboFlashT - dt * 2.5);
-    if (this._comboJumpT  > 0) this._comboJumpT  = Math.max(0, this._comboJumpT  - dt * 2.5);
+    if (this._comboFlashT    > 0) this._comboFlashT    = Math.max(0, this._comboFlashT    - dt * 2.5);
+    if (this._comboJumpT     > 0) this._comboJumpT     = Math.max(0, this._comboJumpT     - dt * 2.5);
+    if (this._oppComboFlashT > 0) this._oppComboFlashT = Math.max(0, this._oppComboFlashT - dt * 2.5);
+    if (this._oppComboJumpT  > 0) this._oppComboJumpT  = Math.max(0, this._oppComboJumpT  - dt * 2.5);
 
     if (this._oppHotRemaining > 0) {
       const tick = Math.min(this._oppHotRemaining, dt);
@@ -1818,12 +1826,14 @@ class DuelBattleScene {
     if (this.playerDefending) this._drawDefenseShield(ctx, W * 0.25, H * 0.68 - jumpOff);
 
     // Opponent (right, humanoid, facing left)
-    const eLunge = this.animState === 'enemyAtk' ? -Math.sin(this.animT * Math.PI) * 50 : 0;
+    const eLunge   = this.animState === 'enemyAtk' ? -Math.sin(this.animT * Math.PI) * 50 : 0;
+    const eJumpOff = this._oppComboJumpT > 0 ? Math.sin((1 - this._oppComboJumpT) * Math.PI) * 45 : 0;
     ctx.save();
-    ctx.translate(W * 0.75 + eLunge, H * 0.68);
+    ctx.translate(W * 0.75 + eLunge, H * 0.68 - eJumpOff);
     ctx.scale(-2, 2);
     CharacterDrawer.drawHumanoid(ctx, 0, 0, this._oppColor, this._oppAccent, true, 0);
     ctx.restore();
+    if (this._oppComboFlashT > 0) this._drawComboFlash(ctx, W * 0.75, H * 0.68 - eJumpOff, this._oppComboFlashT);
 
     this._drawZoneLines(ctx, W, H);
     if (this.zonesActive || this.defenseEnabled) this._drawWheel(ctx, W, H);
