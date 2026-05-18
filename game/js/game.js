@@ -47,6 +47,8 @@ class Game {
         localStorage.removeItem('rpg_account_uuid');
         localStorage.removeItem('rpg_username');
         localStorage.removeItem('rpg_is_admin');
+        localStorage.removeItem('rpg_char_race');
+        localStorage.removeItem('rpg_char_cls');
         window.location.reload();
       };
     }
@@ -61,7 +63,14 @@ class Game {
       if (savedUUID) {
         this._uuid    = savedUUID;
         this._isAdmin = localStorage.getItem('rpg_is_admin') === '1';
-        this._showCharSelect();
+        const savedRace = localStorage.getItem('rpg_char_race');
+        const savedCls  = localStorage.getItem('rpg_char_cls');
+        if (savedRace && savedCls) {
+          // Character already chosen — skip char select and go straight to world
+          this._onCharSelected(savedRace, savedCls);
+        } else {
+          this._showCharSelect();
+        }
       } else {
         UI.showScene('auth');
         this._initAuthHandlers();
@@ -74,6 +83,20 @@ class Game {
   _showCharSelect() {
     UI.showScene('charselect');
     UI.buildCharSelect((race, cls) => this._onCharSelected(race, cls));
+
+    // Show logout button on char select only for authenticated HTTP sessions
+    const btnCSLogout = document.getElementById('btn-charselect-logout');
+    if (btnCSLogout && window.location.protocol !== 'file:' && this._uuid) {
+      btnCSLogout.style.display = '';
+      btnCSLogout.onclick = () => {
+        localStorage.removeItem('rpg_account_uuid');
+        localStorage.removeItem('rpg_username');
+        localStorage.removeItem('rpg_is_admin');
+        localStorage.removeItem('rpg_char_race');
+        localStorage.removeItem('rpg_char_cls');
+        window.location.reload();
+      };
+    }
   }
 
   _initAuthHandlers() {
@@ -255,10 +278,18 @@ class Game {
       this.worldScene._snapCamera();
     }
 
+    if (saved.name) p.name = saved.name;
+
     if (this.scene === 'world') UI.updateWorldStats(p);
   }
 
   _onCharSelected(race, cls) {
+    // Persist the choice so refresh skips char select
+    if (this._uuid) {
+      localStorage.setItem('rpg_char_race', race);
+      localStorage.setItem('rpg_char_cls', cls);
+    }
+
     this.player = new PlayerCharacter(race, cls);
 
     Network.onPlayerLoad = (saved) => this._applyPlayerLoad(saved);

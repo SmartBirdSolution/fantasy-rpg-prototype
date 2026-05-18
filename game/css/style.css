@@ -1616,6 +1616,26 @@ body {
   background: #1a0808 !important;
 }
 
+/* ── CHAR SELECT LOGOUT ──────────────────────────────── */
+#btn-charselect-logout {
+  position: absolute;
+  top: 12px; right: 14px;
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid #5a1a1a;
+  border-radius: 4px;
+  color: #c06060;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+#btn-charselect-logout:hover {
+  border-color: #aa3030;
+  color: #f08080;
+}
+
 /* ── AUTH UI ─────────────────────────────────────────── */
 #auth-ui {
   position: absolute;
