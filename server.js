@@ -48,6 +48,29 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
+  // GET /api/player-char?uuid=xxx — returns saved race/cls so client can skip char select
+  if (req.method === 'GET' && urlPath === '/api/player-char') {
+    const params = new URLSearchParams((req.url.split('?')[1]) || '');
+    const uuid   = params.get('uuid');
+    if (!uuid || uuid.length > 64) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ race: null, cls: null }));
+      return;
+    }
+    try {
+      const player = db.loadPlayer(uuid);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        race: (player && player.race) || null,
+        cls:  (player && player.cls)  || null,
+      }));
+    } catch {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ race: null, cls: null }));
+    }
+    return;
+  }
+
   // POST /auth/register
   if (req.method === 'POST' && urlPath === '/auth/register') {
     let body = '';

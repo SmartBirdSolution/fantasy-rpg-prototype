@@ -63,14 +63,7 @@ class Game {
       if (savedUUID) {
         this._uuid    = savedUUID;
         this._isAdmin = localStorage.getItem('rpg_is_admin') === '1';
-        const savedRace = localStorage.getItem('rpg_char_race');
-        const savedCls  = localStorage.getItem('rpg_char_cls');
-        if (savedRace && savedCls) {
-          // Character already chosen — skip char select and go straight to world
-          this._onCharSelected(savedRace, savedCls);
-        } else {
-          this._showCharSelect();
-        }
+        this._checkSavedChar(savedUUID);
       } else {
         UI.showScene('auth');
         this._initAuthHandlers();
@@ -78,6 +71,28 @@ class Game {
     }
 
     requestAnimationFrame(ts => this._loop(ts));
+  }
+
+  async _checkSavedChar(uuid) {
+    // Fast path: localStorage cache (same device, no network needed)
+    const cachedRace = localStorage.getItem('rpg_char_race');
+    const cachedCls  = localStorage.getItem('rpg_char_cls');
+    if (cachedRace && cachedCls) {
+      this._onCharSelected(cachedRace, cachedCls);
+      return;
+    }
+    // DB path: covers new devices and cleared storage
+    try {
+      const res  = await fetch(`/api/player-char?uuid=${encodeURIComponent(uuid)}`);
+      const json = await res.json();
+      if (json.race && json.cls) {
+        localStorage.setItem('rpg_char_race', json.race);
+        localStorage.setItem('rpg_char_cls', json.cls);
+        this._onCharSelected(json.race, json.cls);
+        return;
+      }
+    } catch { /* server unreachable — fall through to char select */ }
+    this._showCharSelect();
   }
 
   _showCharSelect() {
@@ -166,7 +181,7 @@ class Game {
       localStorage.setItem('rpg_is_admin', json.isAdmin ? '1' : '0');
       this._uuid    = json.uuid;
       this._isAdmin = json.isAdmin === true;
-      this._showCharSelect();
+      await this._checkSavedChar(json.uuid);
 
     } catch {
       errorEl.textContent   = 'Connection error — is the server running?';
