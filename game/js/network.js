@@ -32,6 +32,9 @@ const Network = {
   // Combo animation sync callback (set by DuelBattleScene)
   onComboAnim: null, // ({ sessionId })
 
+  // Persistence callbacks (set by game layer)
+  onPlayerLoad: null, // (savedData)
+
   // City callbacks (set by game layer)
   onCityPopulation: null, // (count)
 
@@ -181,12 +184,20 @@ const Network = {
         this.cityPopulation = msg.count;
         if (this.onCityPopulation) this.onCityPopulation(msg.count);
         break;
+
+      case 'player_load':
+        if (this.onPlayerLoad) this.onPlayerLoad(msg.data);
+        break;
     }
   },
 
   // ── Senders ──────────────────────────────────────────────────────────
-  sendJoin(race, cls, name) {
-    this._send({ type: 'join', race, cls, name });
+  sendJoin(race, cls, name, uuid) {
+    this._send({ type: 'join', race, cls, name, uuid: uuid || undefined });
+  },
+
+  sendPlayerSave(uuid, data) {
+    this._send({ type: 'player_save', uuid, data });
   },
 
   sendMove(x, y, scene) {

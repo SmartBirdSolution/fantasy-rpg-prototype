@@ -1,5 +1,7 @@
 'use strict';
 
+require('dotenv').config();
+
 const http = require('http');
 const fs   = require('fs');
 const path = require('path');
@@ -13,6 +15,8 @@ try {
   process.exit(1);
 }
 
+const db = require('./db');
+
 const PORT     = Number(process.env.PORT) || 3000;
 const GAME_DIR = path.join(__dirname, 'game');
 
@@ -24,12 +28,28 @@ const MIME = {
   '.ico':  'image/x-icon',
 };
 
-// ── HTTP: serve game/ directory ───────────────────────────────────────────────
+// ── HTTP: serve game/ + POST /save (beacon on tab-close) ─────────────────────
 const httpServer = http.createServer((req, res) => {
-  let urlPath = req.url.split('?')[0];
-  if (urlPath === '/') urlPath = '/index.html';
+  const urlPath = req.url.split('?')[0];
 
-  const filePath = path.resolve(GAME_DIR, '.' + urlPath);
+  // POST /save — called via navigator.sendBeacon on page unload
+  if (req.method === 'POST' && urlPath === '/save') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; if (body.length > 1_000_000) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const { uuid, data } = JSON.parse(body);
+        if (uuid && typeof uuid === 'string' && uuid.length <= 64 && data) {
+          db.savePlayer(uuid, data);
+        }
+      } catch { /* ignore malformed payloads */ }
+      res.writeHead(200); res.end('ok');
+    });
+    return;
+  }
+
+  let filePath = urlPath === '/' ? '/index.html' : urlPath;
+  filePath = path.resolve(GAME_DIR, '.' + filePath);
 
   // Prevent path traversal
   if (!filePath.startsWith(GAME_DIR + path.sep) && filePath !== GAME_DIR) {
@@ -183,12 +203,29 @@ wss.on('connection', ws => {
     switch (msg.type) {
 
       case 'join': {
+        const uuid = (typeof msg.uuid === 'string' && msg.uuid.length <= 64) ? msg.uuid : null;
+        state.uuid  = uuid;
         state.race  = msg.race  || null;
         state.cls   = msg.cls   || null;
         state.name  = msg.name  || state.name;
         state.scene = 'world';
         broadcast({ type: 'player_update', player: { id, name: state.name, race: state.race,
           cls: state.cls, x: state.x, y: state.y, scene: state.scene, fightingEnemy: null } }, ws);
+        // Load and send saved player data if UUID provided
+        if (uuid) {
+          try {
+            const saved = db.loadPlayer(uuid);
+            if (saved) sendTo(ws, { type: 'player_load', data: saved });
+          } catch (e) { console.error('DB load error:', e.message); }
+        }
+        break;
+      }
+
+      case 'player_save': {
+        const uuid = state.uuid;
+        if (!uuid || uuid !== msg.uuid) break; // must match the join UUID
+        try { db.savePlayer(uuid, msg.data); }
+        catch (e) { console.error('DB save error:', e.message); }
         break;
       }
 

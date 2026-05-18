@@ -29,6 +29,7 @@ class Game {
   start() {
     this._resize();
     window.addEventListener('resize', () => this._resize());
+    window.addEventListener('beforeunload', () => this._savePlayer());
 
     Network.connect();
     Network.onDuelStart = data => this._onDuelStart(data);
@@ -47,8 +48,110 @@ class Game {
   }
 
   // ── CHAR SELECT → WORLD ──────────────────────────────────────────────
+  _getOrCreateUUID() {
+    let id = localStorage.getItem('rpg_uuid');
+    if (!id) {
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+          });
+      localStorage.setItem('rpg_uuid', id);
+    }
+    return id;
+  }
+
+  _buildSaveData() {
+    const p = this.player;
+    if (!p) return null;
+    return {
+      name:           p.name,
+      race:           p.race,
+      cls:            p.charClass,
+      level:          p.level,
+      xp:             p.xp,
+      baseHP:         p.baseHP,
+      baseAtk:        p.baseAtk,
+      baseDef:        p.baseDef,
+      currentHP:      p.currentHP,
+      gold:           p.gold,
+      championPoints: p.championPoints,
+      worldTileX:     p.worldTileX,
+      worldTileY:     p.worldTileY,
+      inventory:      p.inventory,
+      elixirSlots:    p.elixirSlots,
+      equipped:       p.equipped,
+      combos:         p.combos,
+    };
+  }
+
+  _savePlayer() {
+    if (!this.player || !this._uuid) return;
+    const data = this._buildSaveData();
+    if (!data) return;
+    // Reliable unload save via beacon; regular saves use WebSocket
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      navigator.sendBeacon('/save', JSON.stringify({ uuid: this._uuid, data }));
+    }
+    if (Network.connected) {
+      Network.sendPlayerSave(this._uuid, data);
+    }
+  }
+
+  _applyPlayerLoad(saved) {
+    const p = this.player;
+    if (!p) return;
+
+    p.level          = saved.level          ?? p.level;
+    p.xp             = saved.xp             ?? p.xp;
+    p.baseHP         = saved.baseHP         ?? p.baseHP;
+    p.baseAtk        = saved.baseAtk        ?? p.baseAtk;
+    p.baseDef        = saved.baseDef        ?? p.baseDef;
+    p.gold           = saved.gold           ?? p.gold;
+    p.championPoints = saved.championPoints ?? p.championPoints;
+
+    // Equipped items affect maxHP, so apply before currentHP
+    if (saved.equipped && typeof saved.equipped === 'object') {
+      for (const slot of Object.keys(p.equipped)) {
+        p.equipped[slot] = saved.equipped[slot] ?? null;
+      }
+    }
+    p.currentHP = Math.min(saved.currentHP ?? p.currentHP, p.maxHP);
+
+    if (Array.isArray(saved.inventory)) {
+      p.inventory = new Array(100).fill(null);
+      for (let i = 0; i < Math.min(saved.inventory.length, 100); i++) {
+        p.inventory[i] = saved.inventory[i];
+      }
+    }
+    if (Array.isArray(saved.elixirSlots)) {
+      p.elixirSlots = [null, null, null, null];
+      for (let i = 0; i < Math.min(saved.elixirSlots.length, 4); i++) {
+        p.elixirSlots[i] = saved.elixirSlots[i];
+      }
+    }
+    if (Array.isArray(saved.combos) && saved.combos.length > 0) {
+      p.combos = saved.combos;
+    }
+
+    // Restore world position
+    if (saved.worldTileX != null && this.worldScene) {
+      p.worldTileX = saved.worldTileX;
+      p.worldTileY = saved.worldTileY;
+      this.worldScene.px = saved.worldTileX * TILE_SIZE + TILE_SIZE / 2;
+      this.worldScene.py = saved.worldTileY * TILE_SIZE + TILE_SIZE / 2;
+      this.worldScene._snapCamera();
+    }
+
+    if (this.scene === 'world') UI.updateWorldStats(p);
+  }
+
   _onCharSelected(race, cls) {
+    this._uuid  = this._getOrCreateUUID();
     this.player = new PlayerCharacter(race, cls);
+
+    Network.onPlayerLoad = (saved) => this._applyPlayerLoad(saved);
 
     this.worldScene = new WorldScene(this.canvas, this.player);
     this.cityScene  = new CityScene(this.canvas);
@@ -72,7 +175,7 @@ class Game {
       );
     };
 
-    Network.sendJoin(race, cls, this.player.name);
+    Network.sendJoin(race, cls, this.player.name, this._uuid);
     Network.onCityPopulation = count => UI.updateCityPopulation(count);
 
     document.getElementById('btn-leave-city').addEventListener('click', () => {
@@ -202,6 +305,8 @@ class Game {
     const fromCity = this._preDuelScene === 'city';
     const savedHP  = this._preDuelHP;
 
+    Network.sendPlayerSave(this._uuid, this._buildSaveData());
+
     UI.fadeOut(() => {
       if (fromCity) {
         this.player.currentHP = savedHP ?? this.player.maxHP;
@@ -245,6 +350,7 @@ class Game {
       won ? this.currentEnemy.spawnTX : 0,
       won ? this.currentEnemy.spawnTY : 0
     );
+    Network.sendPlayerSave(this._uuid, this._buildSaveData());
 
     UI.fadeOut(() => {
       if (won) {
@@ -346,6 +452,7 @@ class Game {
       UI.closeTradeWindow();
       this._tradeSession = null;
       UI.updateWorldStats(this.player);
+      Network.sendPlayerSave(this._uuid, this._buildSaveData());
     };
 
     Network.onTradeCancelled = () => {

@@ -12,5 +12,13 @@ desktop.ini
 *.suo
 *.user
 
+# Environment / secrets
+.env
+
+# Database files (local SQLite)
+*.db
+*.db-shm
+*.db-wal
+
 # Claude Code local files
 .claude/settings.local.json
