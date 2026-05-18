@@ -1636,6 +1636,7 @@ class DuelBattleScene {
         if (this._pendingExtraCrit > 0) {
           const xDmg = this._pendingExtraCrit;
           this._pendingExtraCrit = 0;
+          Network.sendExtraCrit(this.sessionId, xDmg);
           this.animState   = 'playerAtk';
           this.animT       = 0;
           this._comboJumpT = 1.0;
@@ -1643,7 +1644,6 @@ class DuelBattleScene {
             this.opponentCurrentHP = Math.max(0, this.opponentCurrentHP - xDmg);
             this._spawnFloat(xDmg, 'opponent');
             this._log(`✦ Fear Move! Extra hit for ${xDmg} damage!`, 'log-loot');
-            Network.sendExtraCrit(this.sessionId, xDmg);
             this.animState = 'idle';
             this._afterAttack(data);
           };
