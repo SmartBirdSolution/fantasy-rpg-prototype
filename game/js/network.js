@@ -29,6 +29,9 @@ const Network = {
   // Extra crit callback (set by DuelBattleScene)
   onExtraCrit: null, // ({ sessionId, dmg })
 
+  // Combo animation sync callback (set by DuelBattleScene)
+  onComboAnim: null, // ({ sessionId })
+
   // City callbacks (set by game layer)
   onCityPopulation: null, // (count)
 
@@ -142,6 +145,10 @@ const Network = {
         if (this.onExtraCrit) this.onExtraCrit(msg);
         break;
 
+      case 'combo_anim':
+        if (this.onComboAnim) this.onComboAnim(msg);
+        break;
+
       case 'trade_request':
         if (this.onTradeRequest) this.onTradeRequest(msg);
         break;
@@ -216,6 +223,10 @@ const Network = {
 
   sendExtraCrit(sessionId, dmg) {
     this._send({ type: 'extra_crit', sessionId, dmg });
+  },
+
+  sendComboAnim(sessionId) {
+    this._send({ type: 'combo_anim', sessionId });
   },
 
   // ── City senders ─────────────────────────────────────────────────────

@@ -1408,11 +1408,14 @@ class DuelBattleScene {
     Network.onDuelForfeit = d => this._onForfeit(d);
     Network.onComboHeal   = ({ sessionId, total }) => {
       if (sessionId !== this.sessionId || this._ended) return;
-      this._oppComboJumpT  = 1.0;
-      this._oppComboFlashT = 1.0;
       this.opponentCurrentHP = Math.min(this.opponent.maxHP, this.opponentCurrentHP + total);
       this.spawnHealFloat(total, 'opponent');
       this._log(`✦ ${this.opponent.name} used Combination! +${total} HP`, 'log-system');
+    };
+    Network.onComboAnim = ({ sessionId }) => {
+      if (sessionId !== this.sessionId || this._ended) return;
+      this._oppComboJumpT  = 1.0;
+      this._oppComboFlashT = 1.0;
     };
     Network.onDuelHeal    = d => {
       const info = d.total;
@@ -1456,6 +1459,7 @@ class DuelBattleScene {
     Network.onDuelHeal    = null;
     Network.onComboHeal   = null;
     Network.onExtraCrit   = null;
+    Network.onComboAnim   = null;
   }
 
   toggleDefense() {
@@ -1719,6 +1723,7 @@ class DuelBattleScene {
     }
     this._comboFlashT = 1.0;
     this._comboJumpT  = 1.0;
+    Network.sendComboAnim(this.sessionId);
   }
 
   spawnHealFloat(amount, target) {
