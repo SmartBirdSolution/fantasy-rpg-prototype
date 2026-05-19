@@ -554,10 +554,13 @@ class WorldScene {
       if (!p.race) continue; // hasn't chosen character yet
       if (p.scene === 'city') continue; // inside city — hidden from world map
 
+      const color  = RACE_DATA[p.race]?.color  ?? '#e8c99a';
+      const accent = RACE_DATA[p.race]?.accent ?? '#b89060';
+
       const inBattle = p.scene === 'battle';
       if (inBattle) ctx.globalAlpha = 0.6;
 
-      CharacterDrawer.drawWorldPlayer(ctx, p.x, p.y + 6, p.race, p.cls);
+      CharacterDrawer.drawWorldPlayer(ctx, p.x, p.y + 6, color, accent);
       ctx.globalAlpha = 1;
 
       // Name tag (different colour from local player)
@@ -582,8 +585,8 @@ class WorldScene {
       this.ctx,
       this.px,
       this.py + 6,
-      this.player.race,
-      this.player.charClass
+      this.player.color,
+      this.player.accent
     );
 
     this.ctx.fillStyle = 'rgba(0,0,0,0.55)';

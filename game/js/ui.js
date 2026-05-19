@@ -215,7 +215,7 @@ const UI = {
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height - 10);
       ctx.scale(1.8, 1.8);
-      player.draw(ctx, 0, 0, false, 'idle', 0, 0);
+      player.draw(ctx, 0, 0, false, 0);
       ctx.restore();
     }
     const profName = PROFESSION_NAMES[player.profession] || 'Adventurer';
@@ -578,7 +578,7 @@ const UI = {
     ctx.save();
     ctx.translate(60, 145);
     ctx.scale(1.8, 1.8);
-    CharacterDrawer.draw(ctx, 0, 0, player.race, player.charClass, true, 'idle', 0, 0);
+    CharacterDrawer.drawHumanoid(ctx, 0, 0, player.color, player.accent, true, 0);
     ctx.restore();
 
     // Stats text

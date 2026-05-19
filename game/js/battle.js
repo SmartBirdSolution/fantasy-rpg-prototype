@@ -460,12 +460,10 @@ class BattleScene {
     // Player
     const pLunge  = this.animState === 'playerAtk' ? Math.sin(this.animT * Math.PI) * 50 : 0;
     const jumpOff = this._comboJumpT > 0 ? Math.sin((1 - this._comboJumpT) * Math.PI) * 45 : 0;
-    const pAnim = this.animState === 'playerAtk' ? 'attack'
-                : (this.animState === 'enemyAtk' && this.animT > 0.45) ? 'hit' : 'idle';
     ctx.save();
     ctx.translate(W * 0.25 + pLunge, H * 0.68 - jumpOff);
     ctx.scale(2, 2);
-    this.player.draw(ctx, 0, 0, true, pAnim, this.animT, this._animTime);
+    this.player.draw(ctx, 0, 0, true, 0);
     ctx.restore();
 
     if (this._comboFlashT > 0) this._drawComboFlash(ctx, W * 0.25, H * 0.68 - jumpOff, this._comboFlashT);
@@ -477,12 +475,10 @@ class BattleScene {
 
     // Enemy
     const eLunge = this.animState === 'enemyAtk' ? -Math.sin(this.animT * Math.PI) * 50 : 0;
-    const eAnim = this.animState === 'enemyAtk' ? 'attack'
-                : (this.animState === 'playerAtk' && this.animT > 0.45) ? 'hit' : 'idle';
     ctx.save();
     ctx.translate(W * 0.75 + eLunge, H * 0.68);
-    ctx.scale(2, 2);
-    this.enemy.draw(ctx, 0, 0, false, eAnim, this.animT, this._animTime);
+    ctx.scale(-2, 2);
+    this.enemy.draw(ctx, 0, 0, true, 0);
     ctx.restore();
 
     this._drawZoneLines(ctx, W, H);
@@ -1391,7 +1387,9 @@ class DuelBattleScene {
     this.onDuelEnd = null;
     this._ended    = false;
 
-
+    const rd = RACE_DATA[opponent.race] || { color: '#888888', accent: '#555555' };
+    this._oppColor  = rd.color;
+    this._oppAccent = rd.accent;
 
     this._clickHandler = e => this._handleClick(e);
     this._moveHandler  = e => this._handleMove(e);
@@ -1824,12 +1822,10 @@ class DuelBattleScene {
     // Player (left)
     const pLunge  = this.animState === 'playerAtk' ? Math.sin(this.animT * Math.PI) * 50 : 0;
     const jumpOff = this._comboJumpT > 0 ? Math.sin((1 - this._comboJumpT) * Math.PI) * 45 : 0;
-    const pAnim = this.animState === 'playerAtk' ? 'attack'
-                : (this.animState === 'enemyAtk' && this.animT > 0.45) ? 'hit' : 'idle';
     ctx.save();
     ctx.translate(W * 0.25 + pLunge, H * 0.68 - jumpOff);
     ctx.scale(2, 2);
-    this.player.draw(ctx, 0, 0, true, pAnim, this.animT, this._animTime);
+    this.player.draw(ctx, 0, 0, true, 0);
     ctx.restore();
     if (this._comboFlashT > 0) this._drawComboFlash(ctx, W * 0.25, H * 0.68 - jumpOff, this._comboFlashT);
     if (this.playerDefending) this._drawDefenseShield(ctx, W * 0.25, H * 0.68 - jumpOff);
@@ -1837,12 +1833,10 @@ class DuelBattleScene {
     // Opponent (right, humanoid, facing left)
     const eLunge   = this.animState === 'enemyAtk' ? -Math.sin(this.animT * Math.PI) * 50 : 0;
     const eJumpOff = this._oppComboJumpT > 0 ? Math.sin((1 - this._oppComboJumpT) * Math.PI) * 45 : 0;
-    const eAnim = this.animState === 'enemyAtk' ? 'attack'
-                : (this.animState === 'playerAtk' && this.animT > 0.45) ? 'hit' : 'idle';
     ctx.save();
     ctx.translate(W * 0.75 + eLunge, H * 0.68 - eJumpOff);
-    ctx.scale(2, 2);
-    CharacterDrawer.draw(ctx, 0, 0, this.opponent.race, this.opponent.cls, false, eAnim, this.animT, this._animTime);
+    ctx.scale(-2, 2);
+    CharacterDrawer.drawHumanoid(ctx, 0, 0, this._oppColor, this._oppAccent, true, 0);
     ctx.restore();
     if (this._oppComboFlashT > 0) this._drawComboFlash(ctx, W * 0.75, H * 0.68 - eJumpOff, this._oppComboFlashT);
 
